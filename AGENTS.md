@@ -1,6 +1,6 @@
-# Blameless — Agent Guide
+# Aftermath — Agent Guide
 
-Blameless is an incident postmortem app. The product surface is the incident timeline at `/incidents`; chat is the agent surface beside it. `/` redirects to shared sign-in, then the incident list. Every incident operation is an action, so the UI and the agent edit the same rows.
+Aftermath is an incident postmortem app. The product surface is the incident timeline at `/incidents`; chat is the agent surface beside it. `/` redirects to shared sign-in, then the incident list. Every incident operation is an action, so the UI and the agent edit the same rows.
 
 ## Skills
 

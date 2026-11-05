@@ -1,10 +1,10 @@
 {
-  "name": "Blameless",
-  "short_name": "Blameless",
-  "description": "Workspace app for Blameless.",
-  "start_url": "./home",
-  "background_color": "#111111",
-  "theme_color": "#18181B",
+  "name": "Aftermath",
+  "short_name": "Aftermath",
+  "description": "An incident postmortem timeline a human can correct and an agent can re-reason from.",
+  "start_url": "/incidents",
+  "background_color": "#F6F1E7",
+  "theme_color": "#2A241C",
   "icons": [
     {
       "src": "icon-192.svg",

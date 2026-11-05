@@ -15,6 +15,7 @@ export const incidents = pgTable("incidents", {
   resolvedAt: text("resolved_at"),
   summary: text("summary"),
   customerStatus: text("customer_status"),
+  postmortemApprovedAt: text("postmortem_approved_at"),
   ...ownableColumns(),
   createdAt: text("created_at")
     .notNull()
@@ -34,6 +35,7 @@ export const incidentEvents = pgTable("incident_events", {
   source: text("source"),
   confidence: integer("confidence").notNull().default(50),
   isRootCause: boolean("is_root_cause").notNull().default(false),
+  originalAt: text("original_at"),
   ...ownableColumns(),
   createdAt: text("created_at")
     .notNull()

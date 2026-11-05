@@ -1,6 +1,6 @@
-# Blameless
+# Aftermath
 
-**An incident postmortem app where the timeline is a shared artifact: a human can correct it, and the agent re-reasons from the correction.**
+**An incident postmortem where the timeline is editable and the conclusion is recomputed.**
 
 Built for the [Agent-Native Hackathon](https://www.builder.io/hackathon) on Builder.io's open-source [Agent-Native](https://agent-native.com) framework.
 
@@ -8,24 +8,33 @@ Built for the [Agent-Native Hackathon](https://www.builder.io/hackathon) on Buil
 
 ## The problem
 
-Every outage ends with someone rebuilding a timeline by hand from logs, deploys, alerts and chat. Then a group of tired people argues about the story, and the postmortem records whatever the loudest person remembered.
+A postmortem is a story about cause and effect: *the deploy at 14:02 caused the errors at 14:03.* If the deploy actually happened at 14:12, that story is false — and every conclusion built on it is false too.
 
-The timeline is the artifact that matters, and it is usually wrong in small ways: an event happened two minutes later than the first draft said, a deploy landed after the errors rather than before. Those small corrections change the conclusion.
+Timelines are usually wrong in small ways. Someone rebuilds them by hand from logs, deploys, alerts and chat, and the postmortem records whatever the room agreed on. Correcting the record later means rewriting the document by hand, and nobody does.
 
-## The 3-beat demo
+## The 90-second demo
 
-1. **Read the timeline.** Open *Checkout latency spike*. Twelve events from 14:00 to 14:34 UTC, each with a source and a confidence score. The deploy sits at 14:02, the first failure at 14:03. Re-check says: **consistent**, one minute apart.
-2. **Correct it.** Drag the deploy to 14:12. The correction saves through the same action the UI and the agent share.
-3. **Re-check.** The verdict flips to **contradicted**: errors began nine minutes *before* the deploy, so the deploy cannot be the cause. The panel also notices that the corrected time now coincides with the database connection pool saturation at 14:12 — an alternative theory worth chasing. The agent sidebar narrates the same finding.
+1. **Read the original story.** The deploy sits at **14:02**, the first failure at **14:03**. Verdict: **consistent** — one minute apart, 28-minute impact window.
+2. **Correct it.** One click (*Try the correction*) or a drag moves the deploy to **14:12**.
+3. **Watch the conclusion change.** The verdict flips to **contradicted**: errors began **9 minutes before** the deploy, so the deploy cannot be the cause. The panel also notices that the corrected time now coincides with the database connection pool saturation at 14:12 — an alternative theory worth chasing.
+4. **The postmortem updates itself.** The generated document includes a **correction log**:
 
-That is the whole thesis: the human corrects the record, and the agent re-reasons from the corrected record instead of defending its first answer.
+   > “Checkout service deploy v2.14.3”: originally 14:02 UTC, corrected to 14:12 UTC.
+
+That last line is the point. Most tools let you edit a timeline. Aftermath makes the correction part of the record, and recomputes what the record means.
 
 ## Why this is agent-native
 
-- **One action, every surface.** `analyze-incident` is a plain typed function. The Re-check button calls it through a React hook, the agent calls it as a tool, and it is also reachable over HTTP and the CLI. There is no second implementation of the verdict.
-- **Shared data.** The timeline lives in PostgreSQL (PGlite locally). A drag in the UI and a tool call from the agent write the same rows.
-- **Shared application state.** The selected event is published to `selection` app state, so "move this one" resolves without the user naming it.
-- **The agent narrates, it does not invent.** The verdict, the minute delta, the impact window and the nearest coincident event are deterministic. The model explains them; it is explicitly instructed not to fabricate events, sources or confidence scores.
+- **One action, every surface.** `analyze-incident` is a typed function. The page calls it through a React hook, the agent calls it as a tool, and it is reachable over HTTP and the CLI. There is no second implementation of the verdict.
+- **Original times are stored, not overwritten.** `incident_events.original_at` keeps the first version of every event, so “before” and “after” are both true data, not UI state.
+- **The agent narrates; it does not invent.** The verdict, minute delta, impact window and nearest signal are computed. The model is instructed to explain them and never fabricate events, sources or confidence scores.
+- **Owner-only approval.** `approve-postmortem` is `uiOnly`: it works for a signed-in person in the app and is refused for the agent, MCP, raw HTTP and the CLI. Verified:
+
+  ```
+  $ pnpm action approve-postmortem --id inc_…
+  Action "approve-postmortem" failed: This action can only be called from the signed-in app UI.
+  ```
+- **Shared application state.** The selected event is published to `selection` state, so “move this one” resolves without the user naming it.
 - **Four-area parity.** Every feature has a UI, an action, written instructions (`AGENTS.md`) and application state.
 
 ## Actions
@@ -33,26 +42,41 @@ That is the whole thesis: the human corrects the record, and the agent re-reason
 | Action | What it does |
 | --- | --- |
 | `list-incidents` | Incidents, newest first |
-| `get-incident` | One incident with its timeline and action items |
+| `get-incident` | One incident with its timeline (current and original times) and action items |
 | `create-incident` | Create an incident |
 | `update-incident-event` | Correct an event's time, title, detail, confidence or suspected-cause flag |
-| `analyze-incident` | Deterministic re-check: `consistent` / `weak` / `contradicted`, impact window, nearest signal |
+| `analyze-incident` | Deterministic verdict for the **current** or **original** timeline: consistent / weak / contradicted, impact window, nearest signal |
+| `generate-postmortem` | The postmortem as Markdown, with a correction log |
+| `approve-postmortem` | Owner-only approval (UI capability required) |
 | `seed-demo-incident` | Load the demo incident (idempotent; hidden from the model) |
+
+## Verified
+
+| Check | Result |
+| --- | --- |
+| `pnpm typecheck` | clean |
+| `pnpm agent-native:doctor` | clean, 14 guards |
+| Original timeline | `consistent`, +1 minute, 28-minute impact window |
+| Deploy corrected +10 minutes | `contradicted`, 9 minutes before the failure |
+| Original timeline after the correction | still `consistent` — the before state is preserved |
+| Generated postmortem | includes the correction log with both times |
+| Approval from the CLI | refused: “can only be called from the signed-in app UI” |
+| Incident list and detail | HTTP 200 |
 
 ## Run it locally
 
 Prerequisites: **Node.js 22.22+** and **pnpm**.
 
 ```bash
-git clone https://github.com/obasky-dev/blameless.git
-cd blameless
+git clone https://github.com/obasky-dev/aftermath.git
+cd aftermath
 pnpm install
 pnpm dev
 ```
 
 Open **http://localhost:8080** and choose *Continue as local dev*.
 
-Then connect a model: a Builder.io account, or an Anthropic / OpenAI key under *Custom keys*. The data screens work without a model; the agent chat does not.
+Connect a model (Builder.io account, or an Anthropic / OpenAI key under *Custom keys*). The data screens and the computed verdict work without a model; the agent chat does not.
 
 Load the demo incident from the empty state (**Load demo incident**) or, with the dev server stopped:
 
@@ -64,10 +88,10 @@ pnpm action seed-demo-incident
 
 ## Demo data
 
-The seeded incident is fictional. Its evidence links point at `example.com` and an illustrative GitHub Actions URL; no real customer data is included. Timestamps are UTC so the server and client render the same timeline.
+The seeded incident is fictional. Evidence links point at `example.com` and an illustrative GitHub Actions URL; no customer data is included. Timestamps are UTC so the server and client agree.
 
 ## Hackathon disclosure
 
-Blameless was built during the Agent-Native Hackathon, starting **2026-11-04**, from the official `chat` starter template. The incident schema, migrations, actions, list and detail screens, horizontal timeline, drag-to-correct interaction, deterministic re-check and demo seed were all written during the event. No pre-existing product code was reused.
+Aftermath was built during the Agent-Native Hackathon, starting **2026-11-04**, from the official `chat` starter template. The incident schema, migrations, actions, before/after comparison, drag-to-correct timeline, deterministic verdict, postmortem generator and demo seed were written during the event. No pre-existing product code was reused.
 
 Built with Agent-Native, React Router, Drizzle ORM, PGlite, Tailwind CSS and Tabler icons.

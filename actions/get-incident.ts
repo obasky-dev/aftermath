@@ -34,6 +34,7 @@ export default defineAction({
         source: z.string().nullable(),
         confidence: z.number(),
         isRootCause: z.boolean(),
+        originalAt: z.string().nullable(),
       }),
     ),
     actionItems: z.array(
@@ -74,6 +75,7 @@ export default defineAction({
         source: incidentEvents.source,
         confidence: incidentEvents.confidence,
         isRootCause: incidentEvents.isRootCause,
+        originalAt: incidentEvents.originalAt,
       })
       .from(incidentEvents)
       .where(eq(incidentEvents.incidentId, id))

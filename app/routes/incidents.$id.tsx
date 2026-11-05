@@ -4,11 +4,14 @@ import { useActionMutation, useActionQuery } from "@agent-native/core/client/hoo
 import {
   IconAlertTriangle,
   IconArrowLeft,
+  IconArrowRight,
+  IconCheck,
   IconCircleCheck,
-  IconClock,
-  IconRefresh,
+  IconCopy,
+  IconDownload,
+  IconSparkles,
 } from "@tabler/icons-react";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import {
@@ -17,43 +20,70 @@ import {
 } from "@/components/incidents/IncidentTimeline";
 import { Button } from "@/components/ui/button";
 
-const SEVERITY_STYLES: Record<string, string> = {
-  sev1: "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400",
-  sev2: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  sev3: "border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400",
-};
-
 const MINUTE = 60_000;
 
-const VERDICT_STYLES = {
+type Verdict = "consistent" | "weak" | "contradicted" | "no-suspect";
+
+interface AnalysisView {
+  mode: "current" | "original";
+  verdict: Verdict;
+  summaryLine: string;
+  impactWindow: { start: string; end: string | null; minutes: number | null } | null;
+  suspect: { id: string; title: string; at: string } | null;
+  firstFailure: { id: string; title: string; at: string } | null;
+  deltaMinutes: number | null;
+  nearest: { id: string; title: string; at: string; deltaMinutes: number } | null;
+  findings: Array<{ tone: "good" | "warn" | "bad"; title: string; detail: string }>;
+}
+
+interface EventRow extends TimelineEvent {
+  originalAt: string | null;
+}
+
+const VERDICT: Record<
+  Verdict,
+  { label: string; badge: string; dot: string; panel: string }
+> = {
   consistent: {
     label: "Consistent",
-    box: "border-emerald-500/30 bg-emerald-500/5",
-    badge: "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    badge:
+      "border-emerald-700/30 bg-emerald-700/10 text-emerald-800 dark:text-emerald-400",
+    dot: "bg-emerald-600",
+    panel: "border-emerald-700/25 bg-emerald-700/[0.04]",
   },
   weak: {
     label: "Weak link",
-    box: "border-amber-500/30 bg-amber-500/5",
-    badge: "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    badge: "border-amber-700/30 bg-amber-700/10 text-amber-800 dark:text-amber-400",
+    dot: "bg-amber-600",
+    panel: "border-amber-700/25 bg-amber-700/[0.04]",
   },
   contradicted: {
     label: "Contradicted",
-    box: "border-red-500/30 bg-red-500/5",
-    badge: "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400",
+    badge: "border-red-800/30 bg-red-800/10 text-red-800 dark:text-red-400",
+    dot: "bg-red-700",
+    panel: "border-red-800/25 bg-red-800/[0.04]",
   },
   "no-suspect": {
     label: "Nothing to check",
-    box: "border-border bg-muted/40",
     badge: "border-border bg-muted text-muted-foreground",
+    dot: "bg-muted-foreground",
+    panel: "border-border bg-muted/40",
   },
-} as const;
+};
 
-function fmtTime(iso: string) {
-  return `${iso.slice(11, 16)} UTC`;
+function fmt(iso: string | null | undefined) {
+  return iso ? `${iso.slice(11, 16)} UTC` : "—";
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 export function meta() {
-  return [{ title: "Incident — Blameless" }];
+  return [{ title: "Incident — Aftermath" }];
 }
 
 export default function IncidentRoute() {
@@ -63,20 +93,31 @@ export default function IncidentRoute() {
 }
 
 function IncidentDetail({ id }: { id: string }) {
-  const { data, isLoading } = useActionQuery("get-incident", { id });
+  const incidentQuery = useActionQuery("get-incident", { id });
+  const originalQuery = useActionQuery("analyze-incident", { id, mode: "original" });
+  const currentQuery = useActionQuery("analyze-incident", { id, mode: "current" });
+  const postmortemQuery = useActionQuery("generate-postmortem", { id });
   const moveEvent = useActionMutation("update-incident-event");
+  const approvePostmortem = useActionMutation("approve-postmortem", { uiOnly: true });
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
-  const [recheckOn, setRecheckOn] = useState(false);
-  const analysis = useActionQuery("analyze-incident", { id }, { enabled: recheckOn });
+  const [copied, setCopied] = useState(false);
 
-  const events = useMemo<TimelineEvent[]>(() => {
-    const rows = data?.events ?? [];
+  const events = useMemo<EventRow[]>(() => {
+    const rows = incidentQuery.data?.events ?? [];
     return rows.map((event) => ({
       ...event,
       at: overrides[event.id] ?? event.at,
     }));
-  }, [data, overrides]);
+  }, [incidentQuery.data, overrides]);
+
+  const corrected = events.some(
+    (event) => event.originalAt !== null && event.originalAt !== event.at,
+  );
+  const original = originalQuery.data as AnalysisView | undefined;
+  const current = currentQuery.data as AnalysisView | undefined;
+  const postmortem = postmortemQuery.data;
 
   useEffect(() => {
     if (events.length === 0) return;
@@ -90,15 +131,22 @@ function IncidentDetail({ id }: { id: string }) {
     void setClientAppState("selection", { incidentId: id, eventId: selectedId });
   }, [id, selectedId]);
 
+  function refreshDerived() {
+    void originalQuery.refetch();
+    void currentQuery.refetch();
+    void postmortemQuery.refetch();
+  }
+
   function applyMove(eventId: string, at: string) {
-    setRecheckOn(false);
-    setOverrides((current) => ({ ...current, [eventId]: at }));
+    setOverrides((state) => ({ ...state, [eventId]: at }));
+    setCopied(false);
     moveEvent.mutate(
       { id: eventId, at },
       {
+        onSuccess: refreshDerived,
         onError: () =>
-          setOverrides((current) => {
-            const next = { ...current };
+          setOverrides((state) => {
+            const next = { ...state };
             delete next[eventId];
             return next;
           }),
@@ -106,35 +154,70 @@ function IncidentDetail({ id }: { id: string }) {
     );
   }
 
-  function nudge(event: TimelineEvent, minutes: number) {
-    applyMove(event.id, new Date(Date.parse(event.at) + minutes * MINUTE).toISOString());
+  function tryCorrection() {
+    const suspect = events.find((event) => event.isRootCause) ?? events.find((event) => event.kind === "deploy");
+    if (!suspect) return;
+    const base = suspect.originalAt ?? suspect.at;
+    applyMove(suspect.id, new Date(Date.parse(base) + 10 * MINUTE).toISOString());
   }
 
-  function recheck() {
-    setRecheckOn(true);
+  function resetCorrection() {
+    for (const event of events) {
+      if (event.originalAt && event.originalAt !== event.at) {
+        applyMove(event.id, event.originalAt);
+      }
+    }
+  }
+
+  function askAgent() {
     try {
       sendToAgentChat({
-        message: `Re-check incident ${id} after a timeline correction. Call analyze-incident for ${id}, then explain in three short paragraphs: (1) what the corrected ordering implies, (2) which theory is contradicted or supported, (3) what evidence would settle it. Do not invent events or sources.`,
+        message: `Explain the correction to incident ${id}. Call analyze-incident twice: mode "original" and mode "current". In three short paragraphs, say what the original timeline implied, what changed when the suspect's time was corrected, and which theory the corrected timeline contradicts. Use the minute figures. Do not invent events or sources.`,
         submit: true,
         openSidebar: true,
       });
     } catch {
-      // The deterministic panel still renders if the chat surface is unavailable.
+      // The computed comparison on the page stands on its own.
     }
   }
 
-  if (isLoading) {
+  async function copyMarkdown() {
+    if (!postmortem) return;
+    try {
+      await navigator.clipboard.writeText(postmortem.markdown);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  function downloadMarkdown() {
+    if (!postmortem) return;
+    const blob = new Blob([postmortem.markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${slugify(postmortem.title)}-postmortem.md`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  if (incidentQuery.isLoading) {
     return (
       <div className="h-full overflow-y-auto">
-        <div className="mx-auto w-full max-w-6xl px-6 py-10">
-          <div className="h-8 w-48 animate-pulse rounded bg-muted" />
-          <div className="mt-6 h-64 animate-pulse rounded-xl border border-border bg-muted/40" />
+        <div className="mx-auto w-full max-w-6xl px-6 py-12">
+          <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+          <div className="mt-6 h-12 w-2/3 animate-pulse rounded bg-muted" />
+          <div className="mt-8 h-48 animate-pulse rounded-md border border-border bg-muted/40" />
         </div>
       </div>
     );
   }
 
-  if (!data) {
+  if (!incidentQuery.data) {
     return (
       <div className="mx-auto w-full max-w-3xl px-6 py-16">
         <p className="text-sm text-muted-foreground">Incident not found.</p>
@@ -145,7 +228,7 @@ function IncidentDetail({ id }: { id: string }) {
     );
   }
 
-  const { incident, actionItems } = data;
+  const { incident, actionItems } = incidentQuery.data;
   const selected = events.find((event) => event.id === selectedId) ?? events[0] ?? null;
   const signals = [...events]
     .filter((event) => event.confidence >= 85)
@@ -155,59 +238,78 @@ function IncidentDetail({ id }: { id: string }) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl px-6 py-10">
-        <Link
-          to="/incidents"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
-        >
-          <IconArrowLeft className="size-3.5" strokeWidth={2} />
-          All incidents
-        </Link>
-
-        <header className="mt-4 flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${
-                  SEVERITY_STYLES[incident.severity] ?? SEVERITY_STYLES.sev3
-                }`}
-              >
-                {incident.severity}
-              </span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                {incident.status === "resolved" ? (
-                  <IconCircleCheck className="size-3.5" strokeWidth={2} />
-                ) : (
-                  <IconAlertTriangle className="size-3.5" strokeWidth={2} />
-                )}
-                {incident.status}
-              </span>
-              <span className="text-[11px] text-muted-foreground">
-                {fmtTime(incident.startedAt)} · {incident.startedAt.slice(0, 10)}
-              </span>
-            </div>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight">{incident.title}</h1>
-            {incident.summary ? (
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-                {incident.summary}
-              </p>
-            ) : null}
-          </div>
-        </header>
-
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
-          <p className="text-sm text-muted-foreground">
-            Corrected an event? Re-check what the new order means.
-          </p>
-          <Button size="sm" onClick={recheck} disabled={analysis.isFetching}>
-            <IconRefresh
-              className={`size-4 ${analysis.isFetching ? "animate-spin" : ""}`}
-              strokeWidth={2}
-            />
-            {analysis.isFetching ? "Re-checking…" : "Re-check timeline"}
+        <div className="flex items-center justify-between">
+          <Link
+            to="/incidents"
+            className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <IconArrowLeft className="size-3.5" strokeWidth={2} />
+            All incidents
+          </Link>
+          <Button variant="outline" size="sm" onClick={askAgent}>
+            <IconSparkles className="size-4" strokeWidth={1.8} />
+            Ask the agent
           </Button>
         </div>
 
-        <div className="mt-4">
+        <header className="mt-8">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            <span>Incident</span>
+            <span aria-hidden="true">·</span>
+            <span>{incident.severity}</span>
+            <span aria-hidden="true">·</span>
+            <span className="inline-flex items-center gap-1">
+              {incident.status === "resolved" ? (
+                <IconCircleCheck className="size-3.5" strokeWidth={2} />
+              ) : (
+                <IconAlertTriangle className="size-3.5" strokeWidth={2} />
+              )}
+              {incident.status}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              {incident.startedAt.slice(0, 10)} · {fmt(incident.startedAt)} → {fmt(incident.resolvedAt)}
+            </span>
+          </div>
+
+          <h1 className="font-display mt-3 text-[2.75rem] leading-[1.02] tracking-[-0.02em] sm:text-6xl">
+            {incident.title}
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
+            {corrected
+              ? "The corrected timeline rules out the deploy. The conclusion below is computed from the times on this page."
+              : "The deploy looks like the cause — until you move it. Correct the timeline and the conclusion changes."}
+          </p>
+        </header>
+
+        <StoryComparison
+          original={original}
+          current={current}
+          corrected={corrected}
+          busy={moveEvent.isPending || currentQuery.isFetching}
+          onTry={tryCorrection}
+          onReset={resetCorrection}
+          onAsk={askAgent}
+        />
+
+        {incident.summary ? (
+          <div className="mt-8 border-l-2 border-primary/60 pl-4">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              What we know
+            </p>
+            <p className="mt-1.5 max-w-4xl text-sm leading-relaxed">{incident.summary}</p>
+          </div>
+        ) : null}
+
+        <section className="mt-10" aria-label="Timeline">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              The timeline
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Drag any event to correct its time · UTC
+            </p>
+          </div>
           <IncidentTimeline
             events={events}
             selectedId={selected?.id ?? null}
@@ -215,72 +317,35 @@ function IncidentDetail({ id }: { id: string }) {
             onMove={applyMove}
             disabled={moveEvent.isPending}
           />
-          {moveEvent.isPending ? (
-            <p className="mt-2 text-right text-[11px] text-muted-foreground">Saving correction…</p>
-          ) : null}
-        </div>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>
+              {selected
+                ? `${selected.title} · ${fmt(selected.at)} · ${selected.confidence}% confidence`
+                : `${events.length} events`}
+            </span>
+            <span>{moveEvent.isPending ? "Saving correction…" : "Every edit is the same action the agent calls."}</span>
+          </div>
+        </section>
 
-        {recheckOn && analysis.data ? <RecheckPanel analysis={analysis.data} /> : null}
+        <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <PostmortemPanel
+            postmortem={postmortem}
+            loading={postmortemQuery.isLoading}
+            approving={approvePostmortem.isPending}
+            copied={copied}
+            onCopy={copyMarkdown}
+            onDownload={downloadMarkdown}
+            onApprove={() =>
+              approvePostmortem.mutate(
+                { id },
+                { onSuccess: () => void postmortemQuery.refetch() },
+              )
+            }
+          />
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section aria-label="Selected event">
-            {selected ? (
-              <div className="rounded-xl border border-border bg-card p-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    {selected.kind}
-                  </span>
-                  {selected.isRootCause ? (
-                    <span className="rounded-full border border-orange-500/40 bg-orange-500/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-orange-600 dark:text-orange-400">
-                      Suspected cause
-                    </span>
-                  ) : null}
-                  <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
-                    {selected.confidence}% confidence
-                  </span>
-                </div>
-
-                <div className="mt-3 flex items-center gap-2 font-mono text-2xl tabular-nums tracking-tight">
-                  <IconClock className="size-5 text-muted-foreground" strokeWidth={1.8} />
-                  {fmtTime(selected.at)}
-                </div>
-
-                <h2 className="mt-3 text-lg font-medium leading-snug">{selected.title}</h2>
-                {selected.detail ? (
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                    {selected.detail}
-                  </p>
-                ) : null}
-
-                <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-foreground/70"
-                    style={{ width: `${selected.confidence}%` }}
-                  />
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => nudge(selected, -1)}>
-                    −1 min
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => nudge(selected, 1)}>
-                    +1 min
-                  </Button>
-                  <span className="text-[11px] text-muted-foreground">
-                    or drag the event on the timeline
-                  </span>
-                </div>
-
-                {selected.source ? (
-                  <p className="mt-4 text-[11px] text-muted-foreground">Source: {selected.source}</p>
-                ) : null}
-              </div>
-            ) : null}
-          </section>
-
-          <aside className="space-y-6">
-            <section className="rounded-xl border border-border bg-card p-4">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <aside className="space-y-7">
+            <section>
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Strongest signals
               </h2>
               <ul className="mt-3 space-y-3">
@@ -294,8 +359,8 @@ function IncidentDetail({ id }: { id: string }) {
                       <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-foreground/40" />
                       <span className="min-w-0">
                         <span className="block text-sm leading-snug">{signal.title}</span>
-                        <span className="block text-[11px] text-muted-foreground">
-                          {signal.confidence}% · {signal.source ?? "unknown source"}
+                        <span className="block font-mono text-[10px] text-muted-foreground">
+                          {fmt(signal.at)} · {signal.confidence}% · {signal.source ?? "unknown"}
                         </span>
                       </span>
                     </button>
@@ -304,8 +369,8 @@ function IncidentDetail({ id }: { id: string }) {
               </ul>
             </section>
 
-            <section className="rounded-xl border border-border bg-card p-4">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <section>
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Action items
               </h2>
               <ul className="mt-3 space-y-3">
@@ -317,7 +382,7 @@ function IncidentDetail({ id }: { id: string }) {
                       <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
                       <div className="min-w-0">
                         <p className="text-sm leading-snug">{item.title}</p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="font-mono text-[10px] text-muted-foreground">
                           {item.owner ?? "unassigned"} · {item.status}
                         </p>
                       </div>
@@ -328,8 +393,8 @@ function IncidentDetail({ id }: { id: string }) {
             </section>
 
             {incident.customerStatus ? (
-              <section className="rounded-xl border border-border bg-muted/40 p-4">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <section className="border-t border-border pt-4">
+                <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                   Customer status
                 </h2>
                 <p className="mt-2 text-sm leading-relaxed">{incident.customerStatus}</p>
@@ -342,59 +407,275 @@ function IncidentDetail({ id }: { id: string }) {
   );
 }
 
-interface RecheckResult {
-  verdict: keyof typeof VERDICT_STYLES;
-  summaryLine: string;
-  impactWindow: { start: string; end: string | null; minutes: number | null } | null;
-  findings: Array<{ tone: "good" | "warn" | "bad"; title: string; detail: string }>;
-}
-
-function RecheckPanel({ analysis }: { analysis: RecheckResult }) {
-  const style = VERDICT_STYLES[analysis.verdict] ?? VERDICT_STYLES["no-suspect"];
+function StoryComparison({
+  original,
+  current,
+  corrected,
+  busy,
+  onTry,
+  onReset,
+  onAsk,
+}: {
+  original: AnalysisView | undefined;
+  current: AnalysisView | undefined;
+  corrected: boolean;
+  busy: boolean;
+  onTry: () => void;
+  onReset: () => void;
+  onAsk: () => void;
+}) {
   return (
-    <section className={`mt-4 rounded-xl border p-5 ${style.box}`} aria-live="polite">
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${style.badge}`}
-        >
-          {style.label}
-        </span>
-        <span className="text-[11px] text-muted-foreground">
-          Re-check · one action shared by the UI and the agent
-        </span>
+    <section className="mt-8" aria-label="Story comparison">
+      <div className="grid overflow-hidden rounded-md border border-border bg-card md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+        <StoryColumn
+          eyebrow="Original story"
+          analysis={original}
+          muted={false}
+        />
+
+        <div className="flex items-center justify-center border-y border-border px-4 py-2 md:border-x md:border-y-0 md:py-0">
+          <IconArrowRight className="size-5 text-muted-foreground" strokeWidth={1.6} />
+        </div>
+
+        {corrected ? (
+          <StoryColumn eyebrow="Corrected story" analysis={current} muted={false} />
+        ) : (
+          <div className="flex min-h-[176px] flex-col items-center justify-center gap-3 bg-muted/30 p-6 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              Corrected story
+            </p>
+            <p className="max-w-[26ch] text-sm leading-relaxed text-muted-foreground">
+              Move the suspected cause ten minutes later and the verdict appears here.
+            </p>
+            <Button size="sm" onClick={onTry} disabled={busy}>
+              Try the correction
+              <IconArrowRight className="size-4" strokeWidth={2} />
+            </Button>
+          </div>
+        )}
       </div>
 
-      <p className="mt-3 text-base font-medium leading-snug">{analysis.summaryLine}</p>
-
-      {analysis.impactWindow ? (
-        <p className="mt-1 text-sm text-muted-foreground">
-          Impact window: {fmtTime(analysis.impactWindow.start)}
-          {analysis.impactWindow.end ? ` → ${fmtTime(analysis.impactWindow.end)}` : ""}
-          {analysis.impactWindow.minutes !== null
-            ? ` (${analysis.impactWindow.minutes} min)`
-            : ""}
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        {corrected ? (
+          <Button variant="outline" size="sm" onClick={onReset} disabled={busy}>
+            Reset to the original
+          </Button>
+        ) : (
+          <Button size="sm" onClick={onTry} disabled={busy}>
+            Try the correction
+            <IconArrowRight className="size-4" strokeWidth={2} />
+          </Button>
+        )}
+        <Button variant="ghost" size="sm" onClick={onAsk}>
+          <IconSparkles className="size-4" strokeWidth={1.8} />
+          Ask the agent to explain
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          {corrected
+            ? "One move. The agent and the page now read the same corrected timeline."
+            : "One move. The verdict is recomputed, not rewritten."}
         </p>
-      ) : null}
-
-      <ul className="mt-4 space-y-3">
-        {analysis.findings.map((finding, index) => (
-          <li key={index} className="flex items-start gap-2">
-            <span
-              className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
-                finding.tone === "bad"
-                  ? "bg-red-500"
-                  : finding.tone === "good"
-                    ? "bg-emerald-500"
-                    : "bg-amber-500"
-              }`}
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-medium leading-snug">{finding.title}</p>
-              <p className="text-sm leading-relaxed text-muted-foreground">{finding.detail}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
+      </div>
     </section>
   );
+}
+
+function StoryColumn({
+  eyebrow,
+  analysis,
+  muted,
+}: {
+  eyebrow: string;
+  analysis: AnalysisView | undefined;
+  muted: boolean;
+}) {
+  const verdict = analysis?.verdict ?? "no-suspect";
+  const style = VERDICT[verdict];
+  const suspectTime = analysis?.suspect?.at;
+  const failureTime = analysis?.firstFailure?.at;
+
+  return (
+    <div className={`p-5 ${muted ? "bg-muted/30" : ""}`}>
+      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        {eyebrow}
+      </p>
+
+      <div className="mt-3 flex items-center gap-2 font-mono text-sm">
+        <span className="text-muted-foreground">deploy</span>
+        <span className="text-lg font-medium tabular-nums">{fmt(suspectTime)}</span>
+        <IconArrowRight className="size-3.5 text-muted-foreground" strokeWidth={2} />
+        <span className="text-muted-foreground">failure</span>
+        <span className="text-lg font-medium tabular-nums">{fmt(failureTime)}</span>
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] ${style.badge}`}
+        >
+          <span className={`size-1.5 rounded-full ${style.dot}`} />
+          {style.label}
+        </span>
+        {analysis?.deltaMinutes !== null && analysis?.deltaMinutes !== undefined ? (
+          <span className="font-mono text-[10px] text-muted-foreground">
+            {analysis.deltaMinutes > 0 ? "+" : ""}
+            {analysis.deltaMinutes} min
+          </span>
+        ) : null}
+      </div>
+
+      <p className="mt-3 text-sm leading-relaxed">{analysis?.summaryLine ?? "Reading the timeline…"}</p>
+    </div>
+  );
+}
+
+function PostmortemPanel({
+  postmortem,
+  loading,
+  approving,
+  copied,
+  onCopy,
+  onDownload,
+  onApprove,
+}: {
+  postmortem:
+    | { title: string; markdown: string; approvedAt: string | null; verdict: string }
+    | undefined;
+  loading: boolean;
+  approving: boolean;
+  copied: boolean;
+  onCopy: () => void;
+  onDownload: () => void;
+  onApprove: () => void;
+}) {
+  return (
+    <section aria-label="Postmortem">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+        <div className="flex items-center gap-2">
+          <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Postmortem
+          </h2>
+          {postmortem?.approvedAt ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-700/30 bg-emerald-700/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-400">
+              <IconCheck className="size-3" strokeWidth={2.5} />
+              Approved {fmt(postmortem.approvedAt)}
+            </span>
+          ) : (
+            <span className="rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              Draft
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onCopy} disabled={!postmortem}>
+            {copied ? <IconCheck className="size-4" strokeWidth={2} /> : <IconCopy className="size-4" strokeWidth={1.8} />}
+            {copied ? "Copied" : "Copy"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={onDownload} disabled={!postmortem}>
+            <IconDownload className="size-4" strokeWidth={1.8} />
+            .md
+          </Button>
+          {postmortem && !postmortem.approvedAt ? (
+            <Button size="sm" onClick={onApprove} disabled={approving}>
+              {approving ? "Approving…" : "Approve"}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-4 max-h-[620px] overflow-y-auto pr-2">
+        {loading || !postmortem ? (
+          <div className="space-y-3">
+            <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-full animate-pulse rounded bg-muted" />
+            <div className="h-3 w-5/6 animate-pulse rounded bg-muted" />
+            <div className="h-3 w-2/3 animate-pulse rounded bg-muted" />
+          </div>
+        ) : (
+          <MarkdownDoc markdown={postmortem.markdown} />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Inline({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.startsWith("**") && part.endsWith("**") ? (
+          <strong key={index} className="font-semibold text-foreground">
+            {part.slice(2, -2)}
+          </strong>
+        ) : (
+          <Fragment key={index}>{part}</Fragment>
+        ),
+      )}
+    </>
+  );
+}
+
+function MarkdownDoc({ markdown }: { markdown: string }) {
+  const lines = markdown.split("\n");
+  const nodes: React.ReactNode[] = [];
+  let list: string[] = [];
+
+  const flush = () => {
+    if (list.length === 0) return;
+    nodes.push(
+      <ul key={`list-${nodes.length}`} className="mt-2 space-y-1.5">
+        {list.map((item, index) => (
+          <li key={index} className="flex gap-2 text-sm leading-relaxed">
+            <span className="mt-2 size-1 shrink-0 rounded-full bg-foreground/40" />
+            <span>
+              <Inline text={item} />
+            </span>
+          </li>
+        ))}
+      </ul>,
+    );
+    list = [];
+  };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (line.startsWith("- ")) {
+      list.push(line.slice(2));
+      continue;
+    }
+    flush();
+
+    if (line === "" || line === "---") {
+      if (line === "---") nodes.push(<hr key={`hr-${nodes.length}`} className="my-5 border-border" />);
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      nodes.push(
+        <h3
+          key={`h3-${nodes.length}`}
+          className="mt-6 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground"
+        >
+          {line.slice(3)}
+        </h3>,
+      );
+      continue;
+    }
+    if (line.startsWith("# ")) {
+      nodes.push(
+        <h2 key={`h2-${nodes.length}`} className="font-display text-2xl tracking-tight">
+          {line.slice(2)}
+        </h2>,
+      );
+      continue;
+    }
+    nodes.push(
+      <p key={`p-${nodes.length}`} className="mt-2 text-sm leading-relaxed">
+        <Inline text={line} />
+      </p>,
+    );
+  }
+  flush();
+
+  return <div>{nodes}</div>;
 }

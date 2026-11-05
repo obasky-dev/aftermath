@@ -63,6 +63,13 @@ CREATE INDEX IF NOT EXISTS incident_events_incident_at_idx ON incident_events (i
 CREATE INDEX IF NOT EXISTS incident_evidence_event_idx ON incident_evidence (event_id);
 CREATE INDEX IF NOT EXISTS incident_action_items_incident_idx ON incident_action_items (incident_id)`,
     },
+    {
+      version: 2,
+      name: "original-times-and-postmortem-approval",
+      sql: `ALTER TABLE incident_events ADD COLUMN IF NOT EXISTS original_at TEXT;
+UPDATE incident_events SET original_at = at WHERE original_at IS NULL;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS postmortem_approved_at TEXT`,
+    },
   ],
   { table: "blameless_migrations" },
 );

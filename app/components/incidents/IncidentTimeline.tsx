@@ -179,9 +179,9 @@ export function IncidentTimeline({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5">
+    <div className="rounded-md border border-border bg-card p-5">
       <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Timeline
         </h2>
         <p className="text-[11px] text-muted-foreground">
@@ -190,13 +190,13 @@ export function IncidentTimeline({
       </div>
 
       <div className="overflow-x-auto pb-2">
-        <div ref={trackRef} className="relative h-[250px] min-w-[640px] select-none">
-          <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border" />
+        <div ref={trackRef} className="relative h-[270px] min-w-[640px] select-none">
+          <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-foreground/15" />
 
           {ticks.map((tick) => (
             <div
               key={tick.at}
-              className="absolute top-0 bottom-6 border-l border-border/50"
+              className="absolute top-0 bottom-6 border-l border-border/60"
               style={{ left: `${tick.percent}%` }}
             >
               <span className="absolute -bottom-6 -translate-x-1/2 font-mono text-[10px] text-muted-foreground">
@@ -207,10 +207,10 @@ export function IncidentTimeline({
 
           {drag ? (
             <div
-              className="pointer-events-none absolute top-2 bottom-6 z-30 border-l-2 border-dashed border-foreground/40"
+              className="pointer-events-none absolute top-2 bottom-6 z-30 border-l-2 border-dashed border-primary/70"
               style={{ left: `${percentFor(drag.at)}%` }}
             >
-              <span className="absolute -top-1 left-1 rounded bg-foreground px-1.5 py-0.5 font-mono text-[10px] text-background">
+              <span className="absolute -top-1 left-1 rounded-sm bg-primary px-1.5 py-0.5 font-mono text-[10px] text-primary-foreground">
                 {fmtTime(drag.at)}
               </span>
             </div>
@@ -248,15 +248,15 @@ export function IncidentTimeline({
                   className={cn(
                     "block size-3 -translate-y-1/2 rounded-full ring-4 ring-card transition-transform",
                     meta.dot,
-                    active && "scale-150 ring-foreground/20",
+                    active && "scale-150 ring-primary/25",
                     dragging && "cursor-ew-resize scale-150",
-                    event.isRootCause && "ring-orange-500/30",
+                    event.isRootCause && "ring-amber-600/30",
                   )}
                 />
                 <span
                   className={cn(
-                    "absolute left-1/2 w-[136px] -translate-x-1/2 rounded-lg border bg-card px-2 py-1.5 text-left shadow-sm transition-colors",
-                    active ? "border-foreground/40" : "border-border",
+                    "absolute left-1/2 w-[150px] -translate-x-1/2 rounded-md border bg-card px-2.5 py-1.5 text-left transition-colors",
+                    active ? "border-primary/70" : "border-border",
                     above ? "bottom-3" : "top-3",
                   )}
                 >
@@ -266,12 +266,12 @@ export function IncidentTimeline({
                       {fmtTime(at)}
                     </span>
                     {event.isRootCause ? (
-                      <span className="ml-auto rounded-sm bg-orange-500/15 px-1 text-[9px] font-semibold uppercase tracking-wide text-orange-600 dark:text-orange-400">
+                      <span className="ml-auto rounded-sm bg-primary/15 px-1 text-[9px] font-semibold uppercase tracking-wide text-primary">
                         Cause
                       </span>
                     ) : null}
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] font-medium leading-tight">
+                  <span className="mt-0.5 block truncate text-xs font-medium leading-tight">
                     {event.title}
                   </span>
                 </span>

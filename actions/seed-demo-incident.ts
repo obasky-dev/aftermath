@@ -221,6 +221,7 @@ export default defineAction({
         source: event.source,
         confidence: event.confidence,
         isRootCause: event.isRootCause,
+        originalAt: event.at,
         ...owner,
       });
     }

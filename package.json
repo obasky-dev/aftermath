@@ -1,8 +1,8 @@
 {
-  "name": "blameless",
-  "displayName": "Blameless",
+  "name": "aftermath",
+  "displayName": "Aftermath",
   "private": true,
-  "description": "Workspace app for Blameless.",
+  "description": "An incident postmortem timeline a human can correct and an agent can re-reason from.",
   "type": "module",
   "scripts": {
     "migrate:production": "tsx scripts/migrate-production.ts",

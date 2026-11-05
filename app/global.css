@@ -6,34 +6,34 @@
 @source "./**/*.{ts,tsx}";
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 0 0% 10%;
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 10%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 10%;
-  --primary: 0 0% 15%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 95%;
-  --secondary-foreground: 0 0% 15%;
-  --muted: 0 0% 95%;
-  --muted-foreground: 0 0% 43%;
-  --accent: 0 0% 95%;
-  --accent-foreground: 0 0% 15%;
-  --destructive: 0 91% 71%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 90%;
-  --input: 0 0% 90%;
-  --ring: 0 0% 40%;
-  --radius: 0.5rem;
-  --sidebar-background: 0 0% 97%;
-  --sidebar-foreground: 0 0% 43%;
-  --sidebar-primary: 0 0% 15%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 0 0% 95%;
-  --sidebar-accent-foreground: 0 0% 15%;
-  --sidebar-border: 0 0% 90%;
-  --sidebar-ring: 0 0% 40%;
+  --background: 42 33% 96%;
+  --foreground: 30 12% 9%;
+  --card: 42 40% 98%;
+  --card-foreground: 30 12% 9%;
+  --popover: 42 40% 98%;
+  --popover-foreground: 30 12% 9%;
+  --primary: 28 72% 32%;
+  --primary-foreground: 42 40% 98%;
+  --secondary: 40 22% 91%;
+  --secondary-foreground: 30 12% 12%;
+  --muted: 40 22% 91%;
+  --muted-foreground: 30 8% 40%;
+  --accent: 38 46% 88%;
+  --accent-foreground: 30 12% 12%;
+  --destructive: 0 72% 45%;
+  --destructive-foreground: 42 40% 98%;
+  --border: 38 18% 82%;
+  --input: 38 18% 82%;
+  --ring: 28 60% 40%;
+  --radius: 0.375rem;
+  --sidebar-background: 42 28% 92%;
+  --sidebar-foreground: 30 8% 38%;
+  --sidebar-primary: 30 12% 10%;
+  --sidebar-primary-foreground: 42 40% 98%;
+  --sidebar-accent: 38 30% 87%;
+  --sidebar-accent-foreground: 30 12% 10%;
+  --sidebar-border: 38 18% 82%;
+  --sidebar-ring: 28 60% 40%;
   --chat-sidebar-width: 17.5rem;
   --chat-sidebar-content-inset: 0.5rem;
   --chat-sidebar-row-padding: 0.75rem;
@@ -229,34 +229,34 @@
 }
 
 .dark {
-  --background: 0 0% 13%;
-  --foreground: 0 0% 90%;
-  --card: 0 0% 16.47%;
-  --card-foreground: 0 0% 90%;
-  --popover: 0 0% 15%;
-  --popover-foreground: 0 0% 90%;
-  --primary: 0 0% 75%;
-  --primary-foreground: 0 0% 10%;
-  --secondary: 0 0% 18%;
-  --secondary-foreground: 0 0% 90%;
-  --muted: 0 0% 16%;
-  --muted-foreground: 0 0% 60%;
-  --accent: 0 0% 18%;
-  --accent-foreground: 0 0% 90%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 24%;
-  --input: 0 0% 24%;
-  --ring: 0 0% 60%;
-  --radius: 0.5rem;
-  --sidebar-background: 0 0% 10%;
-  --sidebar-foreground: 0 0% 60%;
-  --sidebar-primary: 0 0% 75%;
-  --sidebar-primary-foreground: 0 0% 10%;
-  --sidebar-accent: 0 0% 16%;
-  --sidebar-accent-foreground: 0 0% 90%;
-  --sidebar-border: 0 0% 20%;
-  --sidebar-ring: 0 0% 60%;
+  --background: 30 10% 7%;
+  --foreground: 42 28% 92%;
+  --card: 30 9% 10%;
+  --card-foreground: 42 28% 92%;
+  --popover: 30 9% 10%;
+  --popover-foreground: 42 28% 92%;
+  --primary: 30 75% 55%;
+  --primary-foreground: 30 10% 8%;
+  --secondary: 30 8% 15%;
+  --secondary-foreground: 42 28% 92%;
+  --muted: 30 8% 15%;
+  --muted-foreground: 40 12% 65%;
+  --accent: 30 10% 17%;
+  --accent-foreground: 42 28% 92%;
+  --destructive: 0 65% 55%;
+  --destructive-foreground: 42 28% 96%;
+  --border: 30 7% 20%;
+  --input: 30 7% 20%;
+  --ring: 30 55% 55%;
+  --radius: 0.375rem;
+  --sidebar-background: 30 10% 6%;
+  --sidebar-foreground: 40 12% 62%;
+  --sidebar-primary: 42 28% 92%;
+  --sidebar-primary-foreground: 30 10% 8%;
+  --sidebar-accent: 30 8% 14%;
+  --sidebar-accent-foreground: 42 28% 92%;
+  --sidebar-border: 30 7% 18%;
+  --sidebar-ring: 30 55% 55%;
 }
 
 @layer base {
@@ -265,6 +265,21 @@
     font-family: "Inter Variable", "Inter", sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+}
+
+.font-display {
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia,
+    ui-serif, serif;
+  font-feature-settings: "liga", "kern";
+}
+
+.paper-rules {
+  background-image: linear-gradient(
+    to bottom,
+    hsl(var(--border) / 0.5) 1px,
+    transparent 1px
+  );
+  background-size: 100% 30px;
 }
 
 ::-webkit-scrollbar {
