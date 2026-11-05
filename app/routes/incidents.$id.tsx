@@ -292,14 +292,20 @@ function IncidentDetail({ id }: { id: string }) {
           onAsk={askAgent}
         />
 
-        {incident.summary ? (
-          <div className="mt-8 border-l-2 border-primary/60 pl-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              What we know
+        <div className="mt-8 border-l-2 border-primary/60 pl-4">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            What we know now
+          </p>
+          <p className="mt-1.5 max-w-4xl text-sm leading-relaxed">
+            {current?.summaryLine ?? incident.summary ?? "Reading the timeline…"}
+          </p>
+          {current?.impactWindow && current.impactWindow.minutes !== null ? (
+            <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Impact {current.impactWindow.minutes} min ·{" "}
+              {fmt(current.impactWindow.start)} → {fmt(current.impactWindow.end)}
             </p>
-            <p className="mt-1.5 max-w-4xl text-sm leading-relaxed">{incident.summary}</p>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
 
         <section className="mt-10" aria-label="Timeline">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -460,12 +466,7 @@ function StoryComparison({
           <Button variant="outline" size="sm" onClick={onReset} disabled={busy}>
             Reset to the original
           </Button>
-        ) : (
-          <Button size="sm" onClick={onTry} disabled={busy}>
-            Try the correction
-            <IconArrowRight className="size-4" strokeWidth={2} />
-          </Button>
-        )}
+        ) : null}
         <Button variant="ghost" size="sm" onClick={onAsk}>
           <IconSparkles className="size-4" strokeWidth={1.8} />
           Ask the agent to explain

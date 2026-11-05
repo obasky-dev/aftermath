@@ -130,7 +130,11 @@ export default defineAction({
 
 ## Summary
 
-${incident.summary ?? "No summary yet."}
+${analysis.summaryLine}
+
+## Initial account
+
+${incident.summary ?? "No initial account recorded."}
 
 ## Impact
 

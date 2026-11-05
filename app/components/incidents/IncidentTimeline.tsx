@@ -180,15 +180,6 @@ export function IncidentTimeline({
 
   return (
     <div className="rounded-md border border-border bg-card p-5">
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-          Timeline
-        </h2>
-        <p className="text-[11px] text-muted-foreground">
-          Drag an event to correct its time · UTC
-        </p>
-      </div>
-
       <div className="overflow-x-auto pb-2">
         <div ref={trackRef} className="relative h-[270px] min-w-[640px] select-none">
           <div className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-foreground/15" />

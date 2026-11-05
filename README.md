@@ -61,6 +61,7 @@ That last line is the point. Most tools let you edit a timeline. Aftermath makes
 | Original timeline after the correction | still `consistent` — the before state is preserved |
 | Generated postmortem | includes the correction log with both times |
 | Approval from the CLI | refused: “can only be called from the signed-in app UI” |
+| Headless Chromium (end-to-end) | landing → demo → correction → contradicted → correction log → reset; no console errors, no horizontal overflow |
 | Incident list and detail | HTTP 200 |
 
 ## Run it locally
