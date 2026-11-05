@@ -1,6 +1,6 @@
-# Chat — Agent Guide
+# Blameless — Agent Guide
 
-Chat is the minimal chat-first agent-native app. `/` redirects to shared sign-in, then `/home`, the editable Get started page. Chat lives at `/chat`; new chats start there. Actions carry capabilities; screens exist only for durable workflows.
+Blameless is an incident postmortem app. The product surface is the incident timeline at `/incidents`; chat is the agent surface beside it. `/` redirects to shared sign-in, then the incident list. Every incident operation is an action, so the UI and the agent edit the same rows.
 
 ## Skills
 
@@ -19,8 +19,20 @@ For custom branding, keep `server/plugins/agent-native-email-branding.ts` aligne
 
 ## Application state
 
-- `navigation` describes the view and selected ids. Chat is `chat` at `/chat` and `/chat/<threadId>`; the Get started page is `home` at `/home`; `/` opens shared sign-in/signup.
+- `navigation` describes the view and selected ids. Chat is `chat` at `/chat` and `/chat/<threadId>`; incidents is `incidents` at `/incidents` and `/incidents/<id>`; the Get started page is `home` at `/home`; `/` opens shared sign-in/signup.
 - Use `navigate` when supported and `view-screen` for a fresh read of visible details; basic navigation is already in `<current-screen>`.
+
+## Blameless domain
+
+Primary workflow: open an incident, read its timeline, correct an event, and let the agent re-reason from the correction.
+
+- Routes: `/incidents` (list), `/incidents/:id` (timeline, strongest signals, action items). `app.homePath` is `/incidents`.
+- Tables (`server/db/schema.ts`): `incidents`, `incident_events`, `incident_evidence`, `incident_action_items`. Incidents are workspace-visible: reads are intentionally not filtered by owner, because an incident room is shared by responders.
+- Actions: `list-incidents`, `get-incident`, `create-incident`, `update-incident-event`, `analyze-incident`, `seed-demo-incident` (demo data, hidden from the model).
+- Invariants: `update-incident-event` is the only way to correct a timeline; `at` is ISO 8601 with a UTC offset and stored normalized to UTC; `confidence` is 0–100; a correction must not create a new event. Never fabricate an event, a source, or a confidence score — if evidence is missing, say so.
+- Re-check: `analyze-incident` is deterministic and read-only. It compares the suspected cause with the first failure, returns `consistent` / `weak` / `contradicted`, the impact window, and the nearest coincident event. The Re-check button and the agent call the same action; the UI shows the structured verdict, the agent narrates it. Run it after any correction, before asserting causation.
+- App state: view `incidents`, and the open incident id in the route. Use `view-screen` after a correction so the agent sees the edited timeline.
+- Deferred until later days: postmortem drafting, the alert webhook, and production hardening.
 
 ## Building a domain app
 
