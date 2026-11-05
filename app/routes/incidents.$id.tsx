@@ -29,7 +29,7 @@ interface AnalysisView {
   verdict: Verdict;
   summaryLine: string;
   impactWindow: { start: string; end: string | null; minutes: number | null } | null;
-  suspect: { id: string; title: string; at: string } | null;
+  suspect: { id: string; title: string; at: string; kind: string } | null;
   firstFailure: { id: string; title: string; at: string } | null;
   deltaMinutes: number | null;
   nearest: { id: string; title: string; at: string; deltaMinutes: number } | null;
@@ -97,8 +97,12 @@ function IncidentDetail({ id }: { id: string }) {
   const originalQuery = useActionQuery("analyze-incident", { id, mode: "original" });
   const currentQuery = useActionQuery("analyze-incident", { id, mode: "current" });
   const postmortemQuery = useActionQuery("generate-postmortem", { id });
+  const [challengeOn, setChallengeOn] = useState(false);
+  const challengeQuery = useActionQuery("challenge-incident", { id }, { enabled: challengeOn });
   const moveEvent = useActionMutation("update-incident-event");
   const approvePostmortem = useActionMutation("approve-postmortem", { uiOnly: true });
+  const updateActionItem = useActionMutation("update-incident-action-item");
+  const markCause = useActionMutation("mark-incident-cause");
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
@@ -138,6 +142,7 @@ function IncidentDetail({ id }: { id: string }) {
   }
 
   function applyMove(eventId: string, at: string) {
+    setChallengeOn(false);
     setOverrides((state) => ({ ...state, [eventId]: at }));
     setCopied(false);
     moveEvent.mutate(
@@ -155,7 +160,9 @@ function IncidentDetail({ id }: { id: string }) {
   }
 
   function tryCorrection() {
-    const suspect = events.find((event) => event.isRootCause) ?? events.find((event) => event.kind === "deploy");
+    const suspectId =
+      current?.suspect?.id ?? events.find((event) => event.isRootCause)?.id;
+    const suspect = events.find((event) => event.id === suspectId);
     if (!suspect) return;
     const base = suspect.originalAt ?? suspect.at;
     applyMove(suspect.id, new Date(Date.parse(base) + 10 * MINUTE).toISOString());
@@ -179,6 +186,44 @@ function IncidentDetail({ id }: { id: string }) {
     } catch {
       // The computed comparison on the page stands on its own.
     }
+  }
+
+  function askChallenge() {
+    try {
+      sendToAgentChat({
+        message: `Challenge incident ${id}. Call challenge-incident for ${id}, then answer its question using only the timeline. Cite times and confidence scores. If the evidence is missing, say what is missing instead of guessing.`,
+        submit: true,
+        openSidebar: true,
+      });
+    } catch {
+      // The computed challenge panel stands on its own.
+    }
+  }
+
+  function toggleActionItem(item: { id: string; status: string }) {
+    updateActionItem.mutate(
+      { id: item.id, status: item.status === "done" ? "open" : "done" },
+      {
+        onSuccess: () => {
+          void incidentQuery.refetch();
+          void postmortemQuery.refetch();
+        },
+      },
+    );
+  }
+
+  function markSelectedAsCause() {
+    if (!selected) return;
+    markCause.mutate(
+      { incidentId: id, eventId: selected.id },
+      {
+        onSuccess: () => {
+          setChallengeOn(false);
+          refreshDerived();
+          void incidentQuery.refetch();
+        },
+      },
+    );
   }
 
   async function copyMarkdown() {
@@ -276,9 +321,13 @@ function IncidentDetail({ id }: { id: string }) {
             {incident.title}
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            {corrected
-              ? "The corrected timeline rules out the deploy. The conclusion below is computed from the times on this page."
-              : "The deploy looks like the cause — until you move it. Correct the timeline and the conclusion changes."}
+            {!current?.suspect
+              ? "No event is marked as the suspected cause yet. Mark the one you suspect, then correct the timeline."
+              : corrected
+                ? `The corrected timeline rules out the ${current.suspect.kind}. The conclusion below is computed from the times on this page.`
+                : current.suspect.kind === "deploy"
+                  ? "The deploy looks like the cause — until you move it. Correct the timeline and the conclusion changes."
+                  : "The suspected cause looks plausible — until you move it. Correct the timeline and the conclusion changes."}
           </p>
         </header>
 
@@ -287,10 +336,19 @@ function IncidentDetail({ id }: { id: string }) {
           current={current}
           corrected={corrected}
           busy={moveEvent.isPending || currentQuery.isFetching}
+          challenging={challengeQuery.isFetching}
           onTry={tryCorrection}
           onReset={resetCorrection}
           onAsk={askAgent}
+          onChallenge={() => setChallengeOn(true)}
         />
+
+        {challengeOn && challengeQuery.data ? (
+          <ChallengePanel
+            challenge={challengeQuery.data as unknown as ChallengeView}
+            onAsk={askChallenge}
+          />
+        ) : null}
 
         <div className="mt-8 border-l-2 border-primary/60 pl-4">
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -323,13 +381,29 @@ function IncidentDetail({ id }: { id: string }) {
             onMove={applyMove}
             disabled={moveEvent.isPending}
           />
-          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
             <span>
               {selected
                 ? `${selected.title} · ${fmt(selected.at)} · ${selected.confidence}% confidence`
                 : `${events.length} events`}
             </span>
-            <span>{moveEvent.isPending ? "Saving correction…" : "Every edit is the same action the agent calls."}</span>
+            <span className="flex items-center gap-2">
+              {selected && !selected.isRootCause ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={markSelectedAsCause}
+                  disabled={markCause.isPending}
+                >
+                  {markCause.isPending ? "Marking…" : "Mark as suspected cause"}
+                </Button>
+              ) : null}
+              <span>
+                {moveEvent.isPending
+                  ? "Saving correction…"
+                  : "Every edit is the same action the agent calls."}
+              </span>
+            </span>
           </div>
         </section>
 
@@ -383,17 +457,41 @@ function IncidentDetail({ id }: { id: string }) {
                 {actionItems.length === 0 ? (
                   <li className="text-sm text-muted-foreground">None yet.</li>
                 ) : (
-                  actionItems.map((item) => (
-                    <li key={item.id} className="flex items-start gap-2">
-                      <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" />
-                      <div className="min-w-0">
-                        <p className="text-sm leading-snug">{item.title}</p>
-                        <p className="font-mono text-[10px] text-muted-foreground">
-                          {item.owner ?? "unassigned"} · {item.status}
-                        </p>
-                      </div>
-                    </li>
-                  ))
+                  actionItems.map((item) => {
+                    const done = item.status === "done";
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          className="flex w-full items-start gap-2 text-left"
+                          onClick={() => toggleActionItem(item)}
+                          aria-pressed={done}
+                        >
+                          <span
+                            className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm border ${
+                              done
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border"
+                            }`}
+                          >
+                            {done ? <IconCheck className="size-3" strokeWidth={3} /> : null}
+                          </span>
+                          <span className="min-w-0">
+                            <span
+                              className={`block text-sm leading-snug ${
+                                done ? "text-muted-foreground line-through" : ""
+                              }`}
+                            >
+                              {item.title}
+                            </span>
+                            <span className="block font-mono text-[10px] text-muted-foreground">
+                              {item.owner ?? "unassigned"} · {done ? "done" : "open"}
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })
                 )}
               </ul>
             </section>
@@ -418,17 +516,21 @@ function StoryComparison({
   current,
   corrected,
   busy,
+  challenging,
   onTry,
   onReset,
   onAsk,
+  onChallenge,
 }: {
   original: AnalysisView | undefined;
   current: AnalysisView | undefined;
   corrected: boolean;
   busy: boolean;
+  challenging: boolean;
   onTry: () => void;
   onReset: () => void;
   onAsk: () => void;
+  onChallenge: () => void;
 }) {
   return (
     <section className="mt-8" aria-label="Story comparison">
@@ -467,6 +569,10 @@ function StoryComparison({
             Reset to the original
           </Button>
         ) : null}
+        <Button variant="outline" size="sm" onClick={onChallenge} disabled={challenging}>
+          <IconAlertTriangle className="size-4" strokeWidth={1.8} />
+          {corrected ? "Challenge this correction" : "Challenge the timeline"}
+        </Button>
         <Button variant="ghost" size="sm" onClick={onAsk}>
           <IconSparkles className="size-4" strokeWidth={1.8} />
           Ask the agent to explain
@@ -502,7 +608,7 @@ function StoryColumn({
       </p>
 
       <div className="mt-3 flex items-center gap-2 font-mono text-sm">
-        <span className="text-muted-foreground">deploy</span>
+        <span className="text-muted-foreground">suspect</span>
         <span className="text-lg font-medium tabular-nums">{fmt(suspectTime)}</span>
         <IconArrowRight className="size-3.5 text-muted-foreground" strokeWidth={2} />
         <span className="text-muted-foreground">failure</span>
@@ -596,6 +702,62 @@ function PostmortemPanel({
           <MarkdownDoc markdown={postmortem.markdown} />
         )}
       </div>
+    </section>
+  );
+}
+
+interface ChallengeView {
+  verdict: string;
+  corrected: boolean;
+  challenges: Array<{ tone: "good" | "warn" | "bad"; title: string; detail: string }>;
+  question: string;
+}
+
+function ChallengePanel({
+  challenge,
+  onAsk,
+}: {
+  challenge: ChallengeView;
+  onAsk: () => void;
+}) {
+  return (
+    <section className="mt-4 rounded-md border border-border bg-card p-5" aria-live="polite">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Challenge
+        </span>
+        <span className="rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          {challenge.verdict}
+        </span>
+      </div>
+
+      <ul className="mt-4 space-y-3">
+        {challenge.challenges.map((item, index) => (
+          <li key={index} className="flex items-start gap-2">
+            <span
+              className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
+                item.tone === "bad"
+                  ? "bg-red-600"
+                  : item.tone === "good"
+                    ? "bg-emerald-600"
+                    : "bg-amber-600"
+              }`}
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-medium leading-snug">{item.title}</p>
+              <p className="text-sm leading-relaxed text-muted-foreground">{item.detail}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <p className="font-display mt-5 text-xl leading-snug tracking-tight">
+        {challenge.question}
+      </p>
+      <Button variant="outline" size="sm" className="mt-3" onClick={onAsk}>
+        <IconSparkles className="size-4" strokeWidth={1.8} />
+        Ask the agent to answer
+      </Button>
     </section>
   );
 }

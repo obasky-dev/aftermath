@@ -17,7 +17,7 @@ export const analysisOutput = z.object({
     })
     .nullable(),
   suspect: z
-    .object({ id: z.string(), title: z.string(), at: z.string() })
+    .object({ id: z.string(), title: z.string(), at: z.string(), kind: z.string() })
     .nullable(),
   firstFailure: z
     .object({ id: z.string(), title: z.string(), at: z.string() })
@@ -113,7 +113,7 @@ export async function analyzeIncident(
           }
         : null,
       suspect: suspect
-        ? { id: suspect.id, title: suspect.title, at: suspect.time }
+        ? { id: suspect.id, title: suspect.title, at: suspect.time, kind: suspect.kind }
         : null,
       firstFailure: firstFailure
         ? { id: firstFailure.id, title: firstFailure.title, at: firstFailure.time }
@@ -196,7 +196,7 @@ export async function analyzeIncident(
       end: impactEnd,
       minutes: impactEnd ? minutesBetween(impactEnd, firstFailure.time) : null,
     },
-    suspect: { id: suspect.id, title: suspect.title, at: suspect.time },
+    suspect: { id: suspect.id, title: suspect.title, at: suspect.time, kind: suspect.kind },
     firstFailure: { id: firstFailure.id, title: firstFailure.title, at: firstFailure.time },
     deltaMinutes,
     nearest,

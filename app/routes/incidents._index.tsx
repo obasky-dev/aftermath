@@ -22,7 +22,9 @@ export default function IncidentsIndex() {
   const { data, isLoading } = useActionQuery("list-incidents", { limit: 25 });
   const seed = useActionMutation("seed-demo-incident");
   const incidents = data?.incidents ?? [];
-  const demo = incidents[0];
+  const demo =
+    incidents.find((incident) => incident.title === "Checkout latency spike") ??
+    incidents[0];
 
   return (
     <div className="h-full overflow-y-auto">
@@ -56,6 +58,9 @@ export default function IncidentsIndex() {
               {seed.isPending ? "Loading…" : "Load demo incident"}
             </Button>
           )}
+          <Button size="lg" variant="outline" asChild>
+            <Link to="/incidents/new">Import a pack</Link>
+          </Button>
           <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
             15 seconds · no sign-up
           </span>
