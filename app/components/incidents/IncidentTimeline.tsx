@@ -19,6 +19,8 @@ export interface TimelineEvent {
   source: string | null;
   confidence: number;
   isRootCause: boolean;
+  eventStatus?: string;
+  editedBy?: string;
 }
 
 const KIND_META: Record<
@@ -242,6 +244,7 @@ export function IncidentTimeline({
                     active && "scale-150 ring-primary/25",
                     dragging && "cursor-ew-resize scale-150",
                     event.isRootCause && "ring-amber-600/30",
+                    event.eventStatus === "red_herring" && "opacity-40",
                   )}
                 />
                 <span
@@ -249,6 +252,7 @@ export function IncidentTimeline({
                     "absolute left-1/2 w-[150px] -translate-x-1/2 rounded-md border bg-card px-2.5 py-1.5 text-left transition-colors",
                     active ? "border-primary/70" : "border-border",
                     above ? "bottom-3" : "top-3",
+                    event.eventStatus === "red_herring" && "opacity-60",
                   )}
                 >
                   <span className="flex items-center gap-1">
@@ -256,13 +260,30 @@ export function IncidentTimeline({
                     <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
                       {fmtTime(at)}
                     </span>
-                    {event.isRootCause ? (
-                      <span className="ml-auto rounded-sm bg-primary/15 px-1 text-[9px] font-semibold uppercase tracking-wide text-primary">
-                        Cause
-                      </span>
-                    ) : null}
+                    <span className="ml-auto flex items-center gap-1">
+                      {event.isRootCause ? (
+                        <span className="rounded-sm bg-primary/15 px-1 text-[9px] font-semibold uppercase tracking-wide text-primary">
+                          Cause
+                        </span>
+                      ) : null}
+                      {event.eventStatus === "red_herring" ? (
+                        <span className="rounded-sm bg-muted px-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Red herring
+                        </span>
+                      ) : null}
+                      {event.editedBy ? (
+                        <span className="text-[8px] uppercase tracking-wide text-muted-foreground/70">
+                          {event.editedBy === "agent" ? "agent" : "you"}
+                        </span>
+                      ) : null}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block truncate text-xs font-medium leading-tight">
+                  <span
+                    className={cn(
+                      "mt-0.5 block truncate text-xs font-medium leading-tight",
+                      event.eventStatus === "red_herring" && "line-through",
+                    )}
+                  >
                     {event.title}
                   </span>
                 </span>

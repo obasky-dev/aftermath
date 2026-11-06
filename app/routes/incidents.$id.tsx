@@ -27,11 +27,30 @@ const MINUTE = 60_000;
 
 type Verdict = "consistent" | "weak" | "contradicted" | "no-suspect";
 
+interface HypothesisView {
+  id: string;
+  label: string;
+  at: string;
+  kind: string;
+  lagMinutes: number;
+  status: "leading" | "plausible" | "outcompeted" | "contradicted" | "unverifiable";
+  reasons: string[];
+}
+
 interface AnalysisView {
   mode: "current" | "original";
   verdict: Verdict;
   summaryLine: string;
   impactWindow: { start: string; end: string | null; minutes: number | null } | null;
+  exposure: { start: string | null; end: string | null; minutes: number | null } | null;
+  metrics: {
+    timeToDetect: number | null;
+    timeToAcknowledge: number | null;
+    timeToMitigate: number | null;
+    timeToResolve: number | null;
+  } | null;
+  hypotheses: HypothesisView[];
+  leading: HypothesisView | null;
   suspect: { id: string; title: string; at: string; kind: string } | null;
   firstFailure: { id: string; title: string; at: string } | null;
   deltaMinutes: number | null;
@@ -41,7 +60,41 @@ interface AnalysisView {
 
 interface EventRow extends TimelineEvent {
   originalAt: string | null;
+  eventStatus: string;
+  editedBy: string;
 }
+
+const HYPOTHESIS_STYLES: Record<
+  HypothesisView["status"],
+  { label: string; badge: string; dot: string }
+> = {
+  leading: {
+    label: "Leading",
+    badge:
+      "border-emerald-700/30 bg-emerald-700/10 text-emerald-800 dark:text-emerald-400",
+    dot: "bg-emerald-600",
+  },
+  plausible: {
+    label: "Plausible",
+    badge: "border-amber-700/30 bg-amber-700/10 text-amber-800 dark:text-amber-400",
+    dot: "bg-amber-600",
+  },
+  contradicted: {
+    label: "Contradicted",
+    badge: "border-red-800/30 bg-red-800/10 text-red-800 dark:text-red-400",
+    dot: "bg-red-700",
+  },
+  outcompeted: {
+    label: "Outcompeted",
+    badge: "border-border bg-muted text-muted-foreground",
+    dot: "bg-muted-foreground",
+  },
+  unverifiable: {
+    label: "Unverifiable",
+    badge: "border-amber-700/30 bg-amber-700/10 text-amber-800 dark:text-amber-400",
+    dot: "bg-amber-600",
+  },
+};
 
 const VERDICT: Record<
   Verdict,
@@ -173,8 +226,11 @@ function IncidentDetail({ id }: { id: string }) {
       current?.suspect?.id ?? events.find((event) => event.isRootCause)?.id;
     const suspect = events.find((event) => event.id === suspectId);
     if (!suspect) return;
+    const promotion = events.find((event) => /promot/i.test(event.title));
     const base = suspect.originalAt ?? suspect.at;
-    applyMove(suspect.id, new Date(Date.parse(base) + 10 * MINUTE).toISOString());
+    const target =
+      promotion?.at ?? new Date(Date.parse(base) + 10 * MINUTE).toISOString();
+    if (target !== suspect.at) applyMove(suspect.id, target);
   }
 
   function resetCorrection() {
@@ -406,13 +462,15 @@ function IncidentDetail({ id }: { id: string }) {
             {incident.title}
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
-            {!current?.suspect
-              ? "No event is marked as the suspected cause yet. Mark the one you suspect, then correct the timeline."
+            {!current?.leading
+              ? "No change event falls within ten minutes of onset. Mark the cause, then correct the timeline."
               : corrected
-                ? `The corrected timeline rules out the ${current.suspect.kind}. The conclusion below is computed from the times on this page.`
-                : current.suspect.kind === "deploy"
-                  ? "The deploy looks like the cause — until you move it. Correct the timeline and the conclusion changes."
-                  : "The suspected cause looks plausible — until you move it. Correct the timeline and the conclusion changes."}
+                ? `${current.leading.label} leads at ${current.leading.lagMinutes} minute${current.leading.lagMinutes === 1 ? "" : "s"} before onset.${
+                    current.hypotheses.some((hypothesis) => hypothesis.status === "contradicted")
+                      ? ` ${current.hypotheses.filter((hypothesis) => hypothesis.status === "contradicted").map((hypothesis) => `"${hypothesis.label}"`).join(", ")} ${current.hypotheses.filter((hypothesis) => hypothesis.status === "contradicted").length === 1 ? "is" : "are"} contradicted by the evidence.`
+                      : ""
+                  }`
+                : `${current.leading.label} is the leading theory — but the incident channel says the build was promoted at ${fmt(events.find((event) => /promot/i.test(event.title))?.at)}. Move the build to that time.`}
           </p>
         </header>
 
@@ -427,6 +485,11 @@ function IncidentDetail({ id }: { id: string }) {
           onAsk={askAgent}
           onChallenge={() => setChallengeOn(true)}
         />
+
+        {current ? <MetricsStrip analysis={current} /> : null}
+        {current && current.hypotheses.length > 0 ? (
+          <HypothesesPanel hypotheses={current.hypotheses} />
+        ) : null}
 
         {challengeOn && challengeQuery.data ? (
           <ChallengePanel
@@ -444,7 +507,8 @@ function IncidentDetail({ id }: { id: string }) {
           </p>
           {current?.impactWindow && current.impactWindow.minutes !== null ? (
             <p className="mt-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-              Impact {current.impactWindow.minutes} min ·{" "}
+              Impact {current.impactWindow.minutes} min · Exposure{" "}
+              {current.exposure?.minutes ?? "?"} min ·{" "}
               {fmt(current.impactWindow.start)} → {fmt(current.impactWindow.end)}
             </p>
           ) : null}
@@ -722,9 +786,9 @@ function StoryColumn({
   analysis: AnalysisView | undefined;
   muted: boolean;
 }) {
-  const verdict = analysis?.verdict ?? "no-suspect";
-  const style = VERDICT[verdict];
-  const suspectTime = analysis?.suspect?.at;
+  const leading = analysis?.leading;
+  const style = leading ? HYPOTHESIS_STYLES[leading.status] : HYPOTHESIS_STYLES.outcompeted;
+  const verdictStyle = VERDICT[analysis?.verdict ?? "no-suspect"];
   const failureTime = analysis?.firstFailure?.at;
 
   return (
@@ -734,30 +798,115 @@ function StoryColumn({
       </p>
 
       <div className="mt-3 flex items-center gap-2 font-mono text-sm">
-        <span className="text-muted-foreground">suspect</span>
-        <span className="text-lg font-medium tabular-nums">{fmt(suspectTime)}</span>
+        <span className="text-muted-foreground">lead</span>
+        <span className="text-lg font-medium tabular-nums">{fmt(leading?.at)}</span>
         <IconArrowRight className="size-3.5 text-muted-foreground" strokeWidth={2} />
-        <span className="text-muted-foreground">failure</span>
+        <span className="text-muted-foreground">onset</span>
         <span className="text-lg font-medium tabular-nums">{fmt(failureTime)}</span>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <span
           className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] ${style.badge}`}
         >
           <span className={`size-1.5 rounded-full ${style.dot}`} />
           {style.label}
         </span>
-        {analysis?.deltaMinutes !== null && analysis?.deltaMinutes !== undefined ? (
+        {leading ? (
           <span className="font-mono text-[10px] text-muted-foreground">
-            {analysis.deltaMinutes > 0 ? "+" : ""}
-            {analysis.deltaMinutes} min
+            lag {leading.lagMinutes} min
           </span>
         ) : null}
+        <span
+          className={`ml-auto rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] ${verdictStyle.badge}`}
+        >
+          marked cause: {verdictStyle.label}
+        </span>
       </div>
 
-      <p className="mt-3 text-sm leading-relaxed">{analysis?.summaryLine ?? "Reading the timeline…"}</p>
+      <p className="mt-3 text-sm font-medium leading-snug">
+        {leading?.label ?? "No candidate change within ten minutes"}
+      </p>
+      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+        {analysis?.summaryLine ?? "Reading the timeline…"}
+      </p>
+      <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+        Exposure {analysis?.exposure?.minutes ?? "?"} min
+      </p>
     </div>
+  );
+}
+
+function MetricsStrip({ analysis }: { analysis: AnalysisView }) {
+  const items = [
+    { label: "Detect", value: analysis.metrics?.timeToDetect },
+    { label: "Acknowledge", value: analysis.metrics?.timeToAcknowledge },
+    { label: "Mitigate", value: analysis.metrics?.timeToMitigate },
+    { label: "Resolve", value: analysis.metrics?.timeToResolve },
+    { label: "Exposure", value: analysis.exposure?.minutes ?? null },
+  ];
+
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-5 print:hidden">
+      {items.map((item) => (
+        <div key={item.label} className="bg-card px-4 py-3">
+          <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+            {item.label}
+          </p>
+          <p className="mt-1 font-mono text-2xl tabular-nums">
+            {item.value ?? "—"}
+            {item.value != null ? (
+              <span className="ml-1 text-xs text-muted-foreground">min</span>
+            ) : null}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HypothesesPanel({ hypotheses }: { hypotheses: HypothesisView[] }) {
+  return (
+    <section
+      className="mt-4 rounded-md border border-border bg-card p-4 print:hidden"
+      aria-label="Candidate causes"
+    >
+      <div className="flex items-baseline justify-between">
+        <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Candidate causes
+        </h2>
+        <span className="font-mono text-[10px] text-muted-foreground">
+          {hypotheses.length} changes
+        </span>
+      </div>
+
+      <ul className="mt-2 divide-y divide-border">
+        {hypotheses.map((hypothesis) => {
+          const style = HYPOTHESIS_STYLES[hypothesis.status];
+          return (
+            <li key={hypothesis.id} className="flex flex-wrap items-start gap-3 py-3">
+              <span
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] ${style.badge}`}
+              >
+                <span className={`size-1.5 rounded-full ${style.dot}`} />
+                {style.label}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium leading-snug">{hypothesis.label}</p>
+                <p className="font-mono text-[10px] text-muted-foreground">
+                  {fmt(hypothesis.at)} · lag {hypothesis.lagMinutes} min
+                </p>
+                {hypothesis.reasons.map((reason, index) => (
+                  <p key={index} className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    {reason}
+                  </p>
+                ))}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

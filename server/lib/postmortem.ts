@@ -84,6 +84,26 @@ export async function buildPostmortem(id: string): Promise<Postmortem> {
   const impact = analysis.impactWindow
     ? `${analysis.impactWindow.minutes ?? "?"} minutes, from ${fmt(analysis.impactWindow.start)} to ${fmt(analysis.impactWindow.end)}.`
     : "Unknown.";
+  const exposure = analysis.exposure
+    ? `${analysis.exposure.minutes ?? "?"} minutes, from ${fmt(analysis.exposure.start)} to ${fmt(analysis.exposure.end)}.`
+    : "Unknown.";
+  const metrics = analysis.metrics
+    ? [
+        `- Time to detect: ${analysis.metrics.timeToDetect ?? "n/a"} min`,
+        `- Time to acknowledge: ${analysis.metrics.timeToAcknowledge ?? "n/a"} min`,
+        `- Time to mitigate: ${analysis.metrics.timeToMitigate ?? "n/a"} min`,
+        `- Time to resolve: ${analysis.metrics.timeToResolve ?? "n/a"} min`,
+      ].join("\n")
+    : "No metrics computed.";
+  const candidates =
+    analysis.hypotheses.length > 0
+      ? analysis.hypotheses
+          .map(
+            (hypothesis) =>
+              `- **${hypothesis.status.toUpperCase()}** — ${hypothesis.label} at ${fmt(hypothesis.at)} (lag ${hypothesis.lagMinutes} min). ${hypothesis.reasons.join(" ")}`,
+          )
+          .join("\n")
+      : "No candidate changes.";
 
   const timeline = events
     .map((event) => {
@@ -157,6 +177,12 @@ ${incident.summary ?? "No initial account recorded."}
 
 ${impact}
 
+Exposure from the leading change: ${exposure}
+
+## Metrics
+
+${metrics}
+
 ## What happened
 
 ${timeline}
@@ -166,6 +192,10 @@ ${timeline}
 **Verdict: ${analysis.verdict.toUpperCase()}.** ${analysis.summaryLine}
 
 ${findings}
+
+## Candidate causes
+
+${candidates}
 
 ## Evidence
 

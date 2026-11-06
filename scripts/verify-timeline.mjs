@@ -44,7 +44,23 @@ const auth = await call("/_agent-native/auth/local-dev", {
 check("local-dev sign-in", auth.status === 200, `status ${auth.status}`);
 
 const list = await call("/_agent-native/actions/list-incidents");
-const seed = list.json?.incidents?.find((row) => row.title === "Checkout latency spike");
+for (const legacy of (list.json?.incidents ?? []).filter(
+  (row) => row.title === "Checkout latency spike",
+)) {
+  await call("/_agent-native/actions/delete-incident", {
+    method: "DELETE",
+    body: JSON.stringify({ id: legacy.id }),
+  });
+}
+const seeded = await call("/_agent-native/actions/seed-demo-incident", {
+  method: "POST",
+  body: "{}",
+});
+const seed =
+  list.json?.incidents?.find((row) => row.title === "Checkout API 5xx spike") ??
+  (seeded.json?.incidentId
+    ? { id: seeded.json.incidentId, title: "Checkout API 5xx spike" }
+    : null);
 check("seed incident is present", Boolean(seed), seed?.id ?? "missing");
 
 let root = null;
@@ -56,20 +72,28 @@ try {
   );
   const events = incident.json?.events ?? [];
   root = events.find((event) => event.isRootCause) ?? null;
-  check("seed has a 12-event timeline", events.length === 12, `${events.length} events`);
+  check("seed has an 11-event timeline", events.length === 11, `${events.length} events`);
   check("seed has a suspected cause", Boolean(root), root?.title ?? "none");
 
   const originalAnalysis = await call(
     `/_agent-native/actions/analyze-incident?id=${encodeURIComponent(seed.id)}&mode=original`,
   );
+  const originalJson = originalAnalysis.json;
   check(
-    "original timeline is consistent (+1 min)",
-    originalAnalysis.json?.verdict === "consistent" &&
-      originalAnalysis.json?.deltaMinutes === 1,
-    `${originalAnalysis.json?.verdict} / ${originalAnalysis.json?.deltaMinutes}`,
+    "original timeline: the deploy is 25 minutes early",
+    originalJson?.verdict === "weak" &&
+      originalJson?.deltaMinutes === 25 &&
+      originalJson?.exposure?.minutes === 43,
+    `${originalJson?.verdict} / ${originalJson?.deltaMinutes} / exposure ${originalJson?.exposure?.minutes}`,
+  );
+  check(
+    "original leading cause is the database failover",
+    originalJson?.leading?.label === "Database replica failover" &&
+      originalJson?.leading?.lagMinutes === 5,
+    `${originalJson?.leading?.label} / ${originalJson?.leading?.lagMinutes}`,
   );
 
-  const movedAt = new Date(Date.parse(root.at) + 10 * 60_000).toISOString();
+  const movedAt = "2026-11-04T14:02:00.000Z";
   const move = await call("/_agent-native/actions/update-incident-event", {
     method: "PUT",
     body: JSON.stringify({ id: root.id, at: movedAt }),
@@ -83,11 +107,23 @@ try {
   const currentAnalysis = await call(
     `/_agent-native/actions/analyze-incident?id=${encodeURIComponent(seed.id)}&mode=current`,
   );
+  const currentJson = currentAnalysis.json;
   check(
-    "corrected timeline is contradicted (-9 min)",
-    currentAnalysis.json?.verdict === "contradicted" &&
-      currentAnalysis.json?.deltaMinutes === -9,
-    `${currentAnalysis.json?.verdict} / ${currentAnalysis.json?.deltaMinutes}`,
+    "corrected timeline: the deploy leads at 3 minutes",
+    currentJson?.verdict === "consistent" &&
+      currentJson?.deltaMinutes === 3 &&
+      currentJson?.leading?.lagMinutes === 3 &&
+      currentJson?.exposure?.minutes === 21,
+    `${currentJson?.verdict} / ${currentJson?.deltaMinutes} / exposure ${currentJson?.exposure?.minutes}`,
+  );
+  check(
+    "the database failover is contradicted",
+    (currentJson?.hypotheses ?? []).some(
+      (hypothesis) =>
+        hypothesis.label === "Database replica failover" &&
+        hypothesis.status === "contradicted",
+    ),
+    "hypothesis status",
   );
 
   const originalAgain = await call(
@@ -95,7 +131,7 @@ try {
   );
   check(
     "the original timeline is preserved",
-    originalAgain.json?.verdict === "consistent",
+    originalAgain.json?.verdict === "weak",
     originalAgain.json?.verdict,
   );
 
@@ -105,14 +141,14 @@ try {
   const markdown = postmortem.json?.markdown ?? "";
   check(
     "postmortem cites the correction",
-    markdown.includes("originally 14:02 UTC") &&
-      markdown.includes("corrected to 14:12 UTC"),
+    markdown.includes("originally 13:40 UTC") &&
+      markdown.includes("corrected to 14:02 UTC"),
     "correction log",
   );
   check(
-    "postmortem summary follows the corrected verdict",
-    markdown.includes("CONTRADICTED"),
-    "verdict line",
+    "postmortem includes metrics and candidate causes",
+    markdown.includes("## Metrics") && markdown.includes("## Candidate causes"),
+    "sections",
   );
 
   const challenge = await call(
@@ -179,14 +215,14 @@ try {
     check(
       "the shared postmortem loads without a session",
       publicPage.status === 200 &&
-        html.includes("Checkout latency spike") &&
+        html.includes("Checkout API 5xx spike") &&
         html.includes("Discussion"),
       `${publicPage.status} · ${html.length} bytes`,
     );
   }
 
   const filtered = await call(
-    "/_agent-native/actions/list-incidents?search=checkout&severity=sev2&status=resolved",
+    "/_agent-native/actions/list-incidents?search=Checkout%20API&severity=sev1&status=resolved",
   );
   check(
     "search and filters narrow the list",

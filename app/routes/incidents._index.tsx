@@ -50,7 +50,7 @@ export default function IncidentsIndex() {
   const incidents = data?.incidents ?? [];
   const demoIncidents = demoQuery.data?.incidents ?? [];
   const demo =
-    demoIncidents.find((incident) => incident.title === "Checkout latency spike") ??
+    demoIncidents.find((incident) => incident.title.includes("Checkout API")) ??
     demoIncidents[0];
   const filtering = Boolean(q || severity || status);
 

@@ -87,6 +87,14 @@ CREATE TABLE IF NOT EXISTS incident_comments (
 );
 CREATE INDEX IF NOT EXISTS incident_comments_incident_idx ON incident_comments (incident_id, created_at)`,
     },
+    {
+      version: 4,
+      name: "event-review-state",
+      sql: `ALTER TABLE incidents ADD COLUMN IF NOT EXISTS service TEXT;
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS source TEXT;
+ALTER TABLE incident_events ADD COLUMN IF NOT EXISTS event_status TEXT NOT NULL DEFAULT 'confirmed';
+ALTER TABLE incident_events ADD COLUMN IF NOT EXISTS edited_by TEXT NOT NULL DEFAULT 'human'`,
+    },
   ],
   { table: "blameless_migrations" },
 );

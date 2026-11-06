@@ -11,6 +11,8 @@ export const incidents = pgTable("incidents", {
   title: text("title").notNull(),
   severity: text("severity").notNull().default("sev2"),
   status: text("status").notNull().default("open"),
+  service: text("service"),
+  source: text("source"),
   startedAt: text("started_at").notNull(),
   resolvedAt: text("resolved_at"),
   summary: text("summary"),
@@ -36,6 +38,8 @@ export const incidentEvents = pgTable("incident_events", {
   source: text("source"),
   confidence: integer("confidence").notNull().default(50),
   isRootCause: boolean("is_root_cause").notNull().default(false),
+  eventStatus: text("event_status").notNull().default("confirmed"),
+  editedBy: text("edited_by").notNull().default("human"),
   originalAt: text("original_at"),
   ...ownableColumns(),
   createdAt: text("created_at")
