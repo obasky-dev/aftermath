@@ -236,6 +236,47 @@ try {
     `${emptySearch.json?.incidents?.length ?? 0} results`,
   );
 
+  const readiness = await call(
+    `/_agent-native/actions/get-readiness?id=${encodeURIComponent(seed.id)}`,
+  );
+  check(
+    "readiness passes after the correction",
+    readiness.json?.ready === true && (readiness.json?.checks?.length ?? 0) === 7,
+    `${readiness.json?.ready} / ${readiness.json?.checks?.length ?? 0} checks`,
+  );
+
+  const summaries = await call(
+    `/_agent-native/actions/get-summaries?id=${encodeURIComponent(seed.id)}`,
+  );
+  check(
+    "three audience summaries are generated",
+    Boolean(summaries.json?.engineer) &&
+      Boolean(summaries.json?.executive) &&
+      Boolean(summaries.json?.customer) &&
+      summaries.json.customer.includes("restored"),
+    "engineer/executive/customer",
+  );
+
+  const createdArtifacts = await call(
+    "/_agent-native/actions/create-postmortem-artifacts",
+    { method: "POST", body: JSON.stringify({ id: seed.id }) },
+  );
+  const artifactRows = createdArtifacts.json?.artifacts ?? [];
+  check(
+    "approval artifacts are created as labelled fixtures",
+    artifactRows.length === 5 && artifactRows.every((row) => row.mode === "fixture"),
+    `${artifactRows.length} artifacts`,
+  );
+
+  const listedArtifacts = await call(
+    `/_agent-native/actions/get-postmortem-artifacts?id=${encodeURIComponent(seed.id)}`,
+  );
+  check(
+    "artifacts are listed for the incident",
+    (listedArtifacts.json?.artifacts ?? []).length === 5,
+    `${listedArtifacts.json?.artifacts?.length ?? 0} artifacts`,
+  );
+
   const pack = [
     "2026-11-02 09:00 [alert] disk full on node-3 | node-exporter",
     "09:01 [error] writes fail with ENOSPC | app logs",

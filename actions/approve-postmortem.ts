@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
+import { ensureArtifacts } from "../server/lib/ship.js";
 
 export default defineAction({
   description:
@@ -15,8 +16,18 @@ export default defineAction({
   outputSchema: z.object({
     id: z.string(),
     approvedAt: z.string(),
+    artifacts: z.array(
+      z.object({
+        id: z.string(),
+        provider: z.string(),
+        kind: z.string(),
+        title: z.string(),
+        status: z.string(),
+        mode: z.string(),
+      }),
+    ),
   }),
-  run: async ({ id }) => {
+  run: async ({ id }, ctx) => {
     const approvedAt = new Date().toISOString();
     const [row] = await getDb()
       .update(schema.incidents)
@@ -26,6 +37,23 @@ export default defineAction({
     if (!row || !row.approvedAt) {
       fail("Incident not found.", { errorCode: "not_found", statusCode: 404 });
     }
-    return { id: row.id, approvedAt: row.approvedAt };
+
+    const artifacts = await ensureArtifacts(id, {
+      userEmail: ctx?.userEmail,
+      orgId: ctx?.orgId,
+    });
+
+    return {
+      id: row.id,
+      approvedAt: row.approvedAt,
+      artifacts: artifacts.map((artifact) => ({
+        id: artifact.id,
+        provider: artifact.provider,
+        kind: artifact.kind,
+        title: artifact.title,
+        status: artifact.status,
+        mode: artifact.mode,
+      })),
+    };
   },
 });

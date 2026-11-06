@@ -6,12 +6,6 @@ Built for the [Agent-Native Hackathon](https://www.builder.io/hackathon) on Buil
 
 ![Aftermath landing page](docs/screenshots/landing.png)
 
-![Original and corrected stories side by side](docs/screenshots/incident-after.png)
-
-![Challenge panel with evidence-based objections](docs/screenshots/challenge.png)
-
-![Alert automation with a copyable curl command](docs/screenshots/automation.png)
-
 ---
 
 ## The problem
@@ -22,12 +16,12 @@ Timelines are usually wrong in small ways. Someone rebuilds them by hand from lo
 
 ## The 90-second demo
 
-1. **Read the original story.** The deploy sits at **14:02**, the first failure at **14:03**. Verdict: **consistent** — one minute apart, 28-minute impact window.
-2. **Correct it.** One click (*Try the correction*) or a drag moves the deploy to **14:12**.
-3. **Watch the conclusion change.** The verdict flips to **contradicted**: errors began **9 minutes before** the deploy, so the deploy cannot be the cause. The panel also notices that the corrected time now coincides with the database connection pool saturation at 14:12 — an alternative theory worth chasing.
-4. **The postmortem updates itself.** The generated document includes a **correction log**:
+1. **Read the original story.** The r-482 deploy is at **13:40**, but the incident channel says it was promoted at **14:02**. Onset is **14:05**. The database failover at 14:00 leads at **5 minutes**; exposure is **43 minutes**.
+2. **Correct it.** One click (*Try the correction*) moves the deploy to the promotion time, **14:02**.
+3. **Watch the conclusion change.** The deploy now leads at **3 minutes**; exposure drops to **21 minutes**. The database failover becomes **outcompeted and contradicted** by the flat DB connection-error metric.
+4. **The postmortem updates itself.** The generated document includes the metrics, the candidate causes, and a **correction log**:
 
-   > “Checkout service deploy v2.14.3”: originally 14:02 UTC, corrected to 14:12 UTC.
+   > “r-482 deploy”: originally 13:40 UTC, corrected to 14:02 UTC.
 
 That last line is the point. Most tools let you edit a timeline. Aftermath makes the correction part of the record, and recomputes what the record means.
 
@@ -64,6 +58,12 @@ The same operation is the `create-incident-from-alert` action, so the agent can 
 - **Discussion** comments are part of the incident and the generated document, so a decision recorded during the incident survives in the postmortem.
 - **Search and filters** narrow the incident list by text, severity and status; the filter state lives in the URL, so it is shareable and visible to the agent.
 
+## Review & ship
+
+Approval is a checklist, not a button. `get-readiness` verifies the impact window, the marked cause, owner teams, a detection item, a prevention item, blame-free language, and that no competing theory is still plausible. `lint-blame` lists any individual-blaming sentence with a systemic rewrite.
+
+`get-summaries` renders the same computed facts for engineers, executives and customers. Approving creates five artifacts from the incident: Linear issues for the action items, a GitHub draft PR for the prevention work, a Slack post, a Statuspage draft and a Notion export. Until provider credentials are connected these are stored as **fixture** artifacts and labelled `fixture` in the UI; nothing claims to be live.
+
 ## Why this is agent-native
 
 - **One action, every surface.** `analyze-incident` is a typed function. The page calls it through a React hook, the agent calls it as a tool, and it is reachable over HTTP and the CLI. There is no second implementation of the verdict.
@@ -99,6 +99,11 @@ The same operation is the `create-incident-from-alert` action, so the agent can 
 | `list-incident-comments` | Discussion comments, oldest first |
 | `add-incident-comment` | Add a decision or a question to the incident |
 | `update-incident-action-item` | Mark an action item open or done |
+| `get-readiness` | Pre-approval checklist: impact, cause, owners, detection, prevention, blame, unresolved theory |
+| `lint-blame` | Find blame language and return systemic rewrites |
+| `get-summaries` | Engineer, executive and customer views from the same computed facts |
+| `create-postmortem-artifacts` | Create the draft Linear/GitHub/Slack/Statuspage/Notion artifacts (fixture-labelled) |
+| `get-postmortem-artifacts` | List the artifacts created for an incident |
 | `install-alert-webhook` | Return the alert webhook path and token (setup only; hidden from the model) |
 | `delete-incident` | Remove an incident and its children (cleanup; hidden from the model) |
 | `seed-demo-incident` | Load the demo incident (idempotent; hidden from the model) |
@@ -109,20 +114,19 @@ The same operation is the `create-incident-from-alert` action, so the agent can 
 | --- | --- |
 | `pnpm typecheck` | clean |
 | `pnpm agent-native:doctor` | clean, 14 guards |
-| `pnpm test` | 3 parser tests pass |
-| `pnpm verify:timeline` | **25/25 checks** against the running app over HTTP |
-| Original timeline | `consistent`, +1 minute, 28-minute impact window |
-| Deploy corrected +10 minutes | `contradicted`, 9 minutes before the failure |
-| Original timeline after the correction | still `consistent` — the before state is preserved |
-| Generated postmortem | includes the correction log with both times, and a CONTRADICTED summary |
+| `pnpm test` | 4 parser tests pass |
+| `pnpm verify:timeline` | end-to-end checks against the running app over HTTP |
+| Original timeline | deploy 25 min early; the failover leads at 5; exposure 43 min |
+| Deploy moved to 14:02 | deploy leads at 3; exposure 21 min |
+| Database failover | contradicted by flat DB connection errors |
+| Postmortem | correction log 13:40 → 14:02, metrics and candidate causes |
 | Challenge | 3 evidence-based objections and the settling question |
-| Approval from HTTP/CLI | refused with **403**: “can only be called from the signed-in app UI” |
-| Pack import | 3-line pack → 3 events, sources preserved, then cleaned up |
-| Alert webhook | installs with a 32-char token; a wrong token returns **401**; a valid alert returns **202** and creates a sev1 incident with its source |
+| Approval from HTTP/CLI | refused with **403** |
 | Comments | added, listed and cleaned up over HTTP; included in the postmortem |
-| Public share | creates `/share/<token>`; the page loads **without a session** (200, full document) |
-| Filters | search + severity + status → 1 result; a nonsense search → 0 |
-| Headless Chromium (end-to-end) | landing → search → demo → correction → contradicted → correction log → challenge → comment → share (clipboard + public page) → action toggle → reset → pack import → mark cause → contradicted → cleanup; no console errors, no failed requests, no horizontal overflow |
+| Public share | `/share/<token>` loads **without a session** (200, full document) |
+| Filters | search + severity + status → 1; a nonsense search → 0 |
+| Pack import | 3-line pack → 3 events with sources, then cleaned up |
+| Alert webhook | 401 for a wrong token; 202 creates a sev1 incident with its source |
 | Incident list and detail | HTTP 200 |
 
 ## Run it locally

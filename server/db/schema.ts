@@ -83,3 +83,19 @@ export const incidentComments = pgTable("incident_comments", {
     .notNull()
     .default(sql`now()`),
 });
+
+export const postmortemArtifacts = pgTable("postmortem_artifacts", {
+  id: text("id").primaryKey(),
+  incidentId: text("incident_id").notNull(),
+  provider: text("provider").notNull(),
+  kind: text("kind").notNull(),
+  title: text("title").notNull(),
+  url: text("url"),
+  status: text("status").notNull().default("draft"),
+  mode: text("mode").notNull().default("fixture"),
+  payload: text("payload"),
+  ...ownableColumns(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`now()`),
+});

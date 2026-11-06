@@ -557,26 +557,36 @@ function IncidentDetail({ id }: { id: string }) {
         </section>
 
         <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <PostmortemPanel
-            postmortem={postmortem}
-            loading={postmortemQuery.isLoading}
-            approving={approvePostmortem.isPending}
-            sharing={sharePostmortem.isPending}
-            copied={copied}
-            shareCopied={shareCopied}
-            slackCopied={slackCopied}
-            onCopy={copyMarkdown}
-            onDownload={downloadMarkdown}
-            onPrint={printPostmortem}
-            onShare={copyShareLink}
-            onSlack={copyForSlack}
-            onApprove={() =>
-              approvePostmortem.mutate(
-                { id },
-                { onSuccess: () => void postmortemQuery.refetch() },
-              )
-            }
-          />
+          <div className="space-y-6">
+            <PostmortemPanel
+              postmortem={postmortem}
+              loading={postmortemQuery.isLoading}
+              approving={approvePostmortem.isPending}
+              sharing={sharePostmortem.isPending}
+              copied={copied}
+              shareCopied={shareCopied}
+              slackCopied={slackCopied}
+              onCopy={copyMarkdown}
+              onDownload={downloadMarkdown}
+              onPrint={printPostmortem}
+              onShare={copyShareLink}
+              onSlack={copyForSlack}
+              onApprove={() =>
+                approvePostmortem.mutate(
+                  { id },
+                  { onSuccess: () => void postmortemQuery.refetch() },
+                )
+              }
+            />
+            <ReviewPanel
+              id={id}
+              approvedAt={postmortem?.approvedAt ?? null}
+              onApproved={() => {
+                void postmortemQuery.refetch();
+                void incidentQuery.refetch();
+              }}
+            />
+          </div>
 
           <aside className="space-y-7 print:hidden">
             <section>
@@ -906,6 +916,151 @@ function HypothesesPanel({ hypotheses }: { hypotheses: HypothesisView[] }) {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+function ReviewPanel({
+  id,
+  approvedAt,
+  onApproved,
+}: {
+  id: string;
+  approvedAt: string | null;
+  onApproved: () => void;
+}) {
+  const readinessQuery = useActionQuery("get-readiness", { id });
+  const summariesQuery = useActionQuery("get-summaries", { id });
+  const artifactsQuery = useActionQuery("get-postmortem-artifacts", { id });
+  const approve = useActionMutation("approve-postmortem", { uiOnly: true });
+  const [audience, setAudience] = useState<"engineer" | "executive" | "customer">(
+    "executive",
+  );
+
+  const checks = readinessQuery.data?.checks ?? [];
+  const artifacts = artifactsQuery.data?.artifacts ?? [];
+  const ready = readinessQuery.data?.ready ?? false;
+  const summary = summariesQuery.data?.[audience] ?? "Generating the summary…";
+
+  return (
+    <section
+      className="rounded-md border border-border bg-card p-5 print:hidden"
+      aria-label="Review and ship"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Review &amp; ship
+        </h2>
+        <span
+          className={`rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] ${
+            approvedAt
+              ? "border-emerald-700/30 bg-emerald-700/10 text-emerald-800 dark:text-emerald-400"
+              : ready
+                ? "border-emerald-700/30 bg-emerald-700/10 text-emerald-800 dark:text-emerald-400"
+                : "border-amber-700/30 bg-amber-700/10 text-amber-800 dark:text-amber-400"
+          }`}
+        >
+          {approvedAt ? `Approved ${fmt(approvedAt)}` : ready ? "Ready" : "Not ready"}
+        </span>
+      </div>
+
+      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+        {checks.map((check) => (
+          <li key={check.key} className="flex items-start gap-2">
+            <span
+              className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
+                check.ok ? "bg-emerald-600" : "bg-red-600"
+              }`}
+            />
+            <div className="min-w-0">
+              <p className="text-sm leading-snug">{check.label}</p>
+              <p className="text-[11px] leading-snug text-muted-foreground">{check.detail}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-5 border-t border-border pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Audience view
+          </h3>
+          <div className="flex gap-1">
+            {(["engineer", "executive", "customer"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setAudience(option)}
+                className={`rounded-sm px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ${
+                  audience === option
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+          {summary}
+        </p>
+      </div>
+
+      <div className="mt-5 border-t border-border pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            Artifacts
+          </h3>
+          <Button
+            size="sm"
+            onClick={() =>
+              approve.mutate(
+                { id },
+                {
+                  onSuccess: () => {
+                    void artifactsQuery.refetch();
+                    void readinessQuery.refetch();
+                    onApproved();
+                  },
+                },
+              )
+            }
+            disabled={!ready || Boolean(approvedAt) || approve.isPending}
+          >
+            {approve.isPending
+              ? "Shipping…"
+              : approvedAt
+                ? "Shipped"
+                : "Approve & ship"}
+          </Button>
+        </div>
+
+        {artifacts.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Approval creates the Linear issues, GitHub draft PR, Slack post, Statuspage
+            draft and Notion export. Until provider credentials are connected they are
+            created as labelled fixtures.
+          </p>
+        ) : (
+          <ul className="mt-2 divide-y divide-border">
+            {artifacts.map((artifact) => (
+              <li key={artifact.id} className="flex flex-wrap items-center gap-2 py-2">
+                <span className="w-16 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+                  {artifact.provider}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm">{artifact.title}</span>
+                <span className="rounded-full border border-border bg-muted px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+                  {artifact.mode}
+                </span>
+                <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+                  {artifact.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </section>
   );
 }

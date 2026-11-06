@@ -95,6 +95,26 @@ ALTER TABLE incidents ADD COLUMN IF NOT EXISTS source TEXT;
 ALTER TABLE incident_events ADD COLUMN IF NOT EXISTS event_status TEXT NOT NULL DEFAULT 'confirmed';
 ALTER TABLE incident_events ADD COLUMN IF NOT EXISTS edited_by TEXT NOT NULL DEFAULT 'human'`,
     },
+    {
+      version: 5,
+      name: "postmortem-artifacts",
+      sql: `CREATE TABLE IF NOT EXISTS postmortem_artifacts (
+  id TEXT PRIMARY KEY,
+  incident_id TEXT NOT NULL REFERENCES incidents(id),
+  provider TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  title TEXT NOT NULL,
+  url TEXT,
+  status TEXT NOT NULL DEFAULT 'draft',
+  mode TEXT NOT NULL DEFAULT 'fixture',
+  payload TEXT,
+  owner_email TEXT NOT NULL DEFAULT '',
+  org_id TEXT,
+  visibility TEXT NOT NULL DEFAULT 'private',
+  created_at TEXT NOT NULL DEFAULT (now())
+);
+CREATE INDEX IF NOT EXISTS postmortem_artifacts_incident_idx ON postmortem_artifacts (incident_id, created_at)`,
+    },
   ],
   { table: "blameless_migrations" },
 );
