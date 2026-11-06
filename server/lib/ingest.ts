@@ -28,6 +28,7 @@ export async function startIngestRun(
   bundle: string,
   owner: Owner,
 ) {
+  // guard:allow-unscoped — incidents are workspace-visible; the run action gates access
   const [incident] = await getDb()
     .select({ id: schema.incidents.id, ownerEmail: schema.incidents.ownerEmail })
     .from(schema.incidents)
