@@ -64,6 +64,14 @@ Approval is a checklist, not a button. `get-readiness` verifies the impact windo
 
 `get-summaries` renders the same computed facts for engineers, executives and customers. Approving creates five artifacts from the incident: Linear issues for the action items, a GitHub draft PR for the prevention work, a Slack post, a Statuspage draft and a Notion export. Until provider credentials are connected these are stored as **fixture** artifacts and labelled `fixture` in the UI; nothing claims to be live.
 
+## Connections
+
+`/connections` lists the evidence providers with an **evidence-coverage meter** across deploy, database, DNS/CDN, monitoring and comms. Each card states **Connected (live)**, **Connected (fixture)** or **Not connected**; nothing fixture-backed is presented as live.
+
+Connect verifies the connection, Test records a delivery, and Send test event appends one provider-shaped event to the open incident. Every adapter normalizes to the same timeline event kinds, so adding a provider does not touch the analysis engine.
+
+No live provider credentials are connected in this build. The provider calls are fixture-backed and labelled. Real GitHub, Vercel, Slack, Linear, PagerDuty, Sentry, Supabase and Cloudflare credentials would switch the same cards to `Connected (live)`.
+
 ## Why this is agent-native
 
 - **One action, every surface.** `analyze-incident` is a typed function. The page calls it through a React hook, the agent calls it as a tool, and it is reachable over HTTP and the CLI. There is no second implementation of the verdict.
@@ -104,6 +112,13 @@ Approval is a checklist, not a button. `get-readiness` verifies the impact windo
 | `get-summaries` | Engineer, executive and customer views from the same computed facts |
 | `create-postmortem-artifacts` | Create the draft Linear/GitHub/Slack/Statuspage/Notion artifacts (fixture-labelled) |
 | `get-postmortem-artifacts` | List the artifacts created for an incident |
+| `list-integrations` | Provider catalog, connection state and evidence coverage |
+| `connect-integration` | Connect a provider in fixture mode (hidden from the model) |
+| `disconnect-integration` | Disconnect a provider (hidden from the model) |
+| `test-integration` | Send a test request and record the delivery |
+| `send-integration-fixture` | Append one provider-shaped fixture event to the timeline |
+| `list-integration-deliveries` | Recent deliveries, newest first |
+| `delete-incident-event` | Delete an event and its evidence (hidden from the model) |
 | `install-alert-webhook` | Return the alert webhook path and token (setup only; hidden from the model) |
 | `delete-incident` | Remove an incident and its children (cleanup; hidden from the model) |
 | `seed-demo-incident` | Load the demo incident (idempotent; hidden from the model) |

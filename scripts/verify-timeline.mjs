@@ -277,6 +277,52 @@ try {
     `${listedArtifacts.json?.artifacts?.length ?? 0} artifacts`,
   );
 
+  const integrations = await call("/_agent-native/actions/list-integrations");
+  check(
+    "provider catalog and coverage are present",
+    (integrations.json?.providers?.length ?? 0) >= 10 &&
+      (integrations.json?.coverage?.length ?? 0) === 5,
+    `${integrations.json?.providers?.length ?? 0} providers`,
+  );
+
+  const connected = await call("/_agent-native/actions/connect-integration", {
+    method: "POST",
+    body: JSON.stringify({ provider: "sentry" }),
+  });
+  check(
+    "a provider connects in fixture mode",
+    connected.status === 200 && connected.json?.mode === "fixture",
+    connected.json?.mode ?? "no mode",
+  );
+
+  const fixture = await call("/_agent-native/actions/send-integration-fixture", {
+    method: "POST",
+    body: JSON.stringify({ provider: "sentry", incidentId: seed.id }),
+  });
+  check(
+    "a fixture event appends to the timeline",
+    fixture.status === 200 && Boolean(fixture.json?.eventId),
+    fixture.json?.eventId ?? "no event",
+  );
+
+  const deliveries = await call("/_agent-native/actions/list-integration-deliveries");
+  check(
+    "deliveries are recorded",
+    (deliveries.json?.deliveries ?? []).some((row) => row.provider === "sentry"),
+    `${deliveries.json?.deliveries?.length ?? 0} deliveries`,
+  );
+
+  if (fixture.json?.eventId) {
+    await call("/_agent-native/actions/delete-incident-event", {
+      method: "DELETE",
+      body: JSON.stringify({ id: fixture.json.eventId }),
+    });
+  }
+  await call("/_agent-native/actions/disconnect-integration", {
+    method: "POST",
+    body: JSON.stringify({ provider: "sentry" }),
+  });
+
   const pack = [
     "2026-11-02 09:00 [alert] disk full on node-3 | node-exporter",
     "09:01 [error] writes fail with ENOSPC | app logs",

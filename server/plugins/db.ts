@@ -115,6 +115,35 @@ ALTER TABLE incident_events ADD COLUMN IF NOT EXISTS edited_by TEXT NOT NULL DEF
 );
 CREATE INDEX IF NOT EXISTS postmortem_artifacts_incident_idx ON postmortem_artifacts (incident_id, created_at)`,
     },
+    {
+      version: 6,
+      name: "integration-connections",
+      sql: `CREATE TABLE IF NOT EXISTS integration_state (
+  provider TEXT PRIMARY KEY,
+  mode TEXT NOT NULL DEFAULT 'fixture',
+  status TEXT NOT NULL DEFAULT 'not_connected',
+  last_checked TEXT,
+  last_error TEXT,
+  settings TEXT,
+  owner_email TEXT NOT NULL DEFAULT '',
+  org_id TEXT,
+  visibility TEXT NOT NULL DEFAULT 'private',
+  created_at TEXT NOT NULL DEFAULT (now())
+);
+CREATE TABLE IF NOT EXISTS integration_deliveries (
+  id TEXT PRIMARY KEY,
+  provider TEXT NOT NULL,
+  event TEXT NOT NULL,
+  status TEXT NOT NULL,
+  at TEXT NOT NULL,
+  incident_id TEXT,
+  owner_email TEXT NOT NULL DEFAULT '',
+  org_id TEXT,
+  visibility TEXT NOT NULL DEFAULT 'private',
+  created_at TEXT NOT NULL DEFAULT (now())
+);
+CREATE INDEX IF NOT EXISTS integration_deliveries_provider_idx ON integration_deliveries (provider, at DESC)`,
+    },
   ],
   { table: "blameless_migrations" },
 );

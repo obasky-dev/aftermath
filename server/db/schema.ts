@@ -99,3 +99,29 @@ export const postmortemArtifacts = pgTable("postmortem_artifacts", {
     .notNull()
     .default(sql`now()`),
 });
+
+export const integrationState = pgTable("integration_state", {
+  provider: text("provider").primaryKey(),
+  mode: text("mode").notNull().default("fixture"),
+  status: text("status").notNull().default("not_connected"),
+  lastChecked: text("last_checked"),
+  lastError: text("last_error"),
+  settings: text("settings"),
+  ...ownableColumns(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`now()`),
+});
+
+export const integrationDeliveries = pgTable("integration_deliveries", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
+  event: text("event").notNull(),
+  status: text("status").notNull(),
+  at: text("at").notNull(),
+  incidentId: text("incident_id"),
+  ...ownableColumns(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`now()`),
+});
