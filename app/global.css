@@ -282,6 +282,27 @@
   background-size: 100% 30px;
 }
 
+@media print {
+  body {
+    background: #fff !important;
+  }
+
+  #postmortem-print {
+    max-height: none !important;
+    overflow: visible !important;
+    padding-right: 0 !important;
+  }
+
+  #postmortem-print h2 {
+    break-after: avoid;
+  }
+
+  #postmortem-print li,
+  #postmortem-print p {
+    break-inside: avoid;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;

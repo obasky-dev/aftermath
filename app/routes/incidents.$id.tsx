@@ -5,10 +5,13 @@ import {
   IconAlertTriangle,
   IconArrowLeft,
   IconArrowRight,
+  IconBrandSlack,
   IconCheck,
   IconCircleCheck,
   IconCopy,
   IconDownload,
+  IconLink,
+  IconPrinter,
   IconSparkles,
 } from "@tabler/icons-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
@@ -97,16 +100,22 @@ function IncidentDetail({ id }: { id: string }) {
   const originalQuery = useActionQuery("analyze-incident", { id, mode: "original" });
   const currentQuery = useActionQuery("analyze-incident", { id, mode: "current" });
   const postmortemQuery = useActionQuery("generate-postmortem", { id });
+  const commentsQuery = useActionQuery("list-incident-comments", { incidentId: id });
   const [challengeOn, setChallengeOn] = useState(false);
   const challengeQuery = useActionQuery("challenge-incident", { id }, { enabled: challengeOn });
   const moveEvent = useActionMutation("update-incident-event");
   const approvePostmortem = useActionMutation("approve-postmortem", { uiOnly: true });
   const updateActionItem = useActionMutation("update-incident-action-item");
   const markCause = useActionMutation("mark-incident-cause");
+  const addComment = useActionMutation("add-incident-comment");
+  const sharePostmortem = useActionMutation("create-postmortem-share");
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [slackCopied, setSlackCopied] = useState(false);
+  const [commentDraft, setCommentDraft] = useState("");
 
   const events = useMemo<EventRow[]>(() => {
     const rows = incidentQuery.data?.events ?? [];
@@ -250,6 +259,82 @@ function IncidentDetail({ id }: { id: string }) {
     URL.revokeObjectURL(url);
   }
 
+  function printPostmortem() {
+    window.print();
+  }
+
+  function slackMessage(url: string, title: string, severity: string, status: string) {
+    const verdict = (current?.verdict ?? "unknown").toUpperCase();
+    const impact =
+      current?.impactWindow && current.impactWindow.minutes !== null
+        ? `${current.impactWindow.minutes} min (${fmt(current.impactWindow.start)}–${fmt(current.impactWindow.end)})`
+        : "n/a";
+    const corrections =
+      events
+        .filter((event) => event.originalAt && event.originalAt !== event.at)
+        .map((event) => `"${event.title}" ${fmt(event.originalAt)} → ${fmt(event.at)}`)
+        .join("; ") || "none";
+    return `*${title}* · ${severity.toUpperCase()} · ${status}\nVerdict: *${verdict}* — ${current?.summaryLine ?? ""}\nImpact: ${impact}\nCorrections: ${corrections}\nPostmortem: ${url}`;
+  }
+
+  function withShareLink(action: (url: string) => Promise<void>) {
+    sharePostmortem.mutate(
+      { id },
+      {
+        onSuccess: async (result) => {
+          const path = result?.path ?? `/incidents/${id}`;
+          await action(`${window.location.origin}${path}`);
+        },
+        onError: async () => {
+          await action(`${window.location.origin}/incidents/${id}`);
+        },
+      },
+    );
+  }
+
+  function copyShareLink() {
+    void withShareLink(async (url) => {
+      try {
+        await navigator.clipboard.writeText(url);
+        setShareCopied(true);
+        window.setTimeout(() => setShareCopied(false), 1600);
+      } catch {
+        setShareCopied(false);
+      }
+    });
+  }
+
+  function copyForSlack() {
+    if (!incidentQuery.data) return;
+    const { incident } = incidentQuery.data;
+    void withShareLink(async (url) => {
+      try {
+        await navigator.clipboard.writeText(
+          slackMessage(url, incident.title, incident.severity, incident.status),
+        );
+        setSlackCopied(true);
+        window.setTimeout(() => setSlackCopied(false), 1600);
+      } catch {
+        setSlackCopied(false);
+      }
+    });
+  }
+
+  function submitComment() {
+    const body = commentDraft.trim();
+    if (!body) return;
+    addComment.mutate(
+      { incidentId: id, body },
+      {
+        onSuccess: () => {
+          setCommentDraft("");
+          void commentsQuery.refetch();
+          void postmortemQuery.refetch();
+        },
+      },
+    );
+  }
+
   if (incidentQuery.isLoading) {
     return (
       <div className="h-full overflow-y-auto">
@@ -283,7 +368,7 @@ function IncidentDetail({ id }: { id: string }) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl px-6 py-10">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between print:hidden">
           <Link
             to="/incidents"
             className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
@@ -297,7 +382,7 @@ function IncidentDetail({ id }: { id: string }) {
           </Button>
         </div>
 
-        <header className="mt-8">
+        <header className="mt-8 print:hidden">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
             <span>Incident</span>
             <span aria-hidden="true">·</span>
@@ -350,7 +435,7 @@ function IncidentDetail({ id }: { id: string }) {
           />
         ) : null}
 
-        <div className="mt-8 border-l-2 border-primary/60 pl-4">
+        <div className="mt-8 border-l-2 border-primary/60 pl-4 print:hidden">
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             What we know now
           </p>
@@ -365,7 +450,7 @@ function IncidentDetail({ id }: { id: string }) {
           ) : null}
         </div>
 
-        <section className="mt-10" aria-label="Timeline">
+        <section className="mt-10 print:hidden" aria-label="Timeline">
           <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
               The timeline
@@ -412,9 +497,15 @@ function IncidentDetail({ id }: { id: string }) {
             postmortem={postmortem}
             loading={postmortemQuery.isLoading}
             approving={approvePostmortem.isPending}
+            sharing={sharePostmortem.isPending}
             copied={copied}
+            shareCopied={shareCopied}
+            slackCopied={slackCopied}
             onCopy={copyMarkdown}
             onDownload={downloadMarkdown}
+            onPrint={printPostmortem}
+            onShare={copyShareLink}
+            onSlack={copyForSlack}
             onApprove={() =>
               approvePostmortem.mutate(
                 { id },
@@ -423,7 +514,7 @@ function IncidentDetail({ id }: { id: string }) {
             }
           />
 
-          <aside className="space-y-7">
+          <aside className="space-y-7 print:hidden">
             <section>
               <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Strongest signals
@@ -496,6 +587,41 @@ function IncidentDetail({ id }: { id: string }) {
               </ul>
             </section>
 
+            <section>
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                Discussion
+              </h2>
+              <ul className="mt-3 space-y-3">
+                {(commentsQuery.data?.comments ?? []).length === 0 ? (
+                  <li className="text-sm text-muted-foreground">No comments yet.</li>
+                ) : (
+                  (commentsQuery.data?.comments ?? []).map((comment) => (
+                    <li key={comment.id}>
+                      <p className="text-sm leading-relaxed">{comment.body}</p>
+                      <p className="font-mono text-[10px] text-muted-foreground">
+                        {comment.author || "anonymous"} · {fmt(comment.createdAt.slice(0, 16))}
+                      </p>
+                    </li>
+                  ))
+                )}
+              </ul>
+              <textarea
+                value={commentDraft}
+                onChange={(event) => setCommentDraft(event.target.value)}
+                rows={3}
+                placeholder="Add a decision or a question"
+                className="mt-3 w-full resize-y rounded-sm border border-border bg-background p-2 text-sm text-foreground outline-none focus:border-primary/60"
+              />
+              <Button
+                size="sm"
+                className="mt-2"
+                onClick={submitComment}
+                disabled={!commentDraft.trim() || addComment.isPending}
+              >
+                {addComment.isPending ? "Adding…" : "Comment"}
+              </Button>
+            </section>
+
             {incident.customerStatus ? (
               <section className="border-t border-border pt-4">
                 <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -533,7 +659,7 @@ function StoryComparison({
   onChallenge: () => void;
 }) {
   return (
-    <section className="mt-8" aria-label="Story comparison">
+    <section className="mt-8 print:hidden" aria-label="Story comparison">
       <div className="grid overflow-hidden rounded-md border border-border bg-card md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
         <StoryColumn
           eyebrow="Original story"
@@ -639,9 +765,15 @@ function PostmortemPanel({
   postmortem,
   loading,
   approving,
+  sharing,
   copied,
+  shareCopied,
+  slackCopied,
   onCopy,
   onDownload,
+  onPrint,
+  onShare,
+  onSlack,
   onApprove,
 }: {
   postmortem:
@@ -649,14 +781,20 @@ function PostmortemPanel({
     | undefined;
   loading: boolean;
   approving: boolean;
+  sharing: boolean;
   copied: boolean;
+  shareCopied: boolean;
+  slackCopied: boolean;
   onCopy: () => void;
   onDownload: () => void;
+  onPrint: () => void;
+  onShare: () => void;
+  onSlack: () => void;
   onApprove: () => void;
 }) {
   return (
     <section aria-label="Postmortem">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 print:hidden">
         <div className="flex items-center gap-2">
           <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Postmortem
@@ -673,7 +811,7 @@ function PostmortemPanel({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={onCopy} disabled={!postmortem}>
             {copied ? <IconCheck className="size-4" strokeWidth={2} /> : <IconCopy className="size-4" strokeWidth={1.8} />}
             {copied ? "Copied" : "Copy"}
@@ -681,6 +819,32 @@ function PostmortemPanel({
           <Button variant="outline" size="sm" onClick={onDownload} disabled={!postmortem}>
             <IconDownload className="size-4" strokeWidth={1.8} />
             .md
+          </Button>
+          <Button variant="outline" size="sm" onClick={onPrint} disabled={!postmortem}>
+            <IconPrinter className="size-4" strokeWidth={1.8} />
+            Print
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onSlack}
+            disabled={!postmortem || sharing}
+          >
+            <IconBrandSlack className="size-4" strokeWidth={1.8} />
+            {slackCopied ? "Copied" : "Slack"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onShare}
+            disabled={!postmortem || sharing}
+          >
+            {shareCopied ? (
+              <IconCheck className="size-4" strokeWidth={2} />
+            ) : (
+              <IconLink className="size-4" strokeWidth={1.8} />
+            )}
+            {shareCopied ? "Copied" : "Share"}
           </Button>
           {postmortem && !postmortem.approvedAt ? (
             <Button size="sm" onClick={onApprove} disabled={approving}>
@@ -690,7 +854,10 @@ function PostmortemPanel({
         </div>
       </div>
 
-      <div className="mt-4 max-h-[620px] overflow-y-auto pr-2">
+      <div
+        id="postmortem-print"
+        className="mt-4 max-h-[620px] overflow-y-auto pr-2 print:mt-0 print:max-h-none print:overflow-visible print:pr-0"
+      >
         {loading || !postmortem ? (
           <div className="space-y-3">
             <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
@@ -721,7 +888,7 @@ function ChallengePanel({
   onAsk: () => void;
 }) {
   return (
-    <section className="mt-4 rounded-md border border-border bg-card p-5" aria-live="polite">
+    <section className="mt-4 rounded-md border border-border bg-card p-5 print:hidden" aria-live="polite">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
           Challenge

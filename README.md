@@ -33,7 +33,7 @@ That last line is the point. Most tools let you edit a timeline. Aftermath makes
 
 ## Bring your own incident
 
-Open **Import a pack** (`/incidents/new`), paste what you actually have — alerts, deploys, log lines, chat, one event per line — and press **Build timeline**. Times and sources are kept exactly as written; lines without a time are skipped, not guessed. Or hand the same pack to the agent: it calls `create-incident-from-pack` and builds the same timeline through the same action.
+Open **Import a pack** (`/incidents/new`), paste what you actually have — alerts, deploys, log lines, chat, one event per line — or open a `.txt`, `.csv`, `.log` or `.md` file — and press **Build timeline**. Times and sources are kept exactly as written; lines without a time are skipped, not guessed. Or hand the same pack to the agent: it calls `create-incident-from-pack` and builds the same timeline through the same action.
 
 ```text
 14:03 [error] 5xx rate climbs from 0.2% to 8.4% | Grafana
@@ -56,6 +56,14 @@ curl -X POST http://localhost:8080/api/ingest-alert \
 
 The same operation is the `create-incident-from-alert` action, so the agent can call it when a person reports an alert in chat. A wrong token returns **401**; the alert source is kept as the incident's first timeline event.
 
+## Share and export
+
+- **Share** copies a public, read-only postmortem link (`/share/<token>`). The page renders without a session: same document, no app chrome.
+- **Print** opens the browser's print dialog with a print stylesheet that strips the comparison, timeline, sidebars and buttons — leaving the postmortem for **Save as PDF**.
+- **Slack** copies a formatted update with the verdict, the minute delta, the impact window, the corrections and the public link.
+- **Discussion** comments are part of the incident and the generated document, so a decision recorded during the incident survives in the postmortem.
+- **Search and filters** narrow the incident list by text, severity and status; the filter state lives in the URL, so it is shareable and visible to the agent.
+
 ## Why this is agent-native
 
 - **One action, every surface.** `analyze-incident` is a typed function. The page calls it through a React hook, the agent calls it as a tool, and it is reachable over HTTP and the CLI. There is no second implementation of the verdict.
@@ -76,7 +84,7 @@ The same operation is the `create-incident-from-alert` action, so the agent can 
 
 | Action | What it does |
 | --- | --- |
-| `list-incidents` | Incidents, newest first |
+| `list-incidents` | Incidents, newest first; optional text, severity and status filters |
 | `get-incident` | One incident with its timeline (current and original times) and action items |
 | `create-incident` | Create an incident |
 | `create-incident-from-alert` | Create an incident from an alert; also powers the inbound webhook |
@@ -85,8 +93,11 @@ The same operation is the `create-incident-from-alert` action, so the agent can 
 | `update-incident-event` | Correct an event's time, title, detail, confidence or suspected-cause flag |
 | `analyze-incident` | Deterministic verdict for the **current** or **original** timeline: consistent / weak / contradicted, impact window, nearest signal |
 | `challenge-incident` | Evidence-based objections, the unverified claims, and the question that would settle it |
-| `generate-postmortem` | The postmortem as Markdown, with a correction log |
+| `generate-postmortem` | The postmortem as Markdown, with a correction log and the discussion |
 | `approve-postmortem` | Owner-only approval (UI capability required) |
+| `create-postmortem-share` | Create or return the public read-only share token (hidden from the model) |
+| `list-incident-comments` | Discussion comments, oldest first |
+| `add-incident-comment` | Add a decision or a question to the incident |
 | `update-incident-action-item` | Mark an action item open or done |
 | `install-alert-webhook` | Return the alert webhook path and token (setup only; hidden from the model) |
 | `delete-incident` | Remove an incident and its children (cleanup; hidden from the model) |
@@ -99,7 +110,7 @@ The same operation is the `create-incident-from-alert` action, so the agent can 
 | `pnpm typecheck` | clean |
 | `pnpm agent-native:doctor` | clean, 14 guards |
 | `pnpm test` | 3 parser tests pass |
-| `pnpm verify:timeline` | **19/19 checks** against the running app over HTTP |
+| `pnpm verify:timeline` | **25/25 checks** against the running app over HTTP |
 | Original timeline | `consistent`, +1 minute, 28-minute impact window |
 | Deploy corrected +10 minutes | `contradicted`, 9 minutes before the failure |
 | Original timeline after the correction | still `consistent` — the before state is preserved |
@@ -108,7 +119,10 @@ The same operation is the `create-incident-from-alert` action, so the agent can 
 | Approval from HTTP/CLI | refused with **403**: “can only be called from the signed-in app UI” |
 | Pack import | 3-line pack → 3 events, sources preserved, then cleaned up |
 | Alert webhook | installs with a 32-char token; a wrong token returns **401**; a valid alert returns **202** and creates a sev1 incident with its source |
-| Headless Chromium (end-to-end) | landing → demo → correction → contradicted → correction log → challenge → action-item toggle → reset → pack import → mark a cause → contradicted → cleanup; no console errors, no failed requests, no horizontal overflow |
+| Comments | added, listed and cleaned up over HTTP; included in the postmortem |
+| Public share | creates `/share/<token>`; the page loads **without a session** (200, full document) |
+| Filters | search + severity + status → 1 result; a nonsense search → 0 |
+| Headless Chromium (end-to-end) | landing → search → demo → correction → contradicted → correction log → challenge → comment → share (clipboard + public page) → action toggle → reset → pack import → mark cause → contradicted → cleanup; no console errors, no failed requests, no horizontal overflow |
 | Incident list and detail | HTTP 200 |
 
 ## Run it locally

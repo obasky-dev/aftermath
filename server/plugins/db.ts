@@ -70,6 +70,24 @@ CREATE INDEX IF NOT EXISTS incident_action_items_incident_idx ON incident_action
 UPDATE incident_events SET original_at = at WHERE original_at IS NULL;
 ALTER TABLE incidents ADD COLUMN IF NOT EXISTS postmortem_approved_at TEXT`,
     },
+    {
+      version: 3,
+      name: "postmortem-sharing-and-comments",
+      sql: `ALTER TABLE incidents ADD COLUMN IF NOT EXISTS share_token TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS incidents_share_token_idx ON incidents (share_token) WHERE share_token IS NOT NULL;
+CREATE TABLE IF NOT EXISTS incident_comments (
+  id TEXT PRIMARY KEY,
+  incident_id TEXT NOT NULL REFERENCES incidents(id),
+  event_id TEXT,
+  body TEXT NOT NULL,
+  author TEXT NOT NULL DEFAULT '',
+  owner_email TEXT NOT NULL DEFAULT '',
+  org_id TEXT,
+  visibility TEXT NOT NULL DEFAULT 'private',
+  created_at TEXT NOT NULL DEFAULT (now())
+);
+CREATE INDEX IF NOT EXISTS incident_comments_incident_idx ON incident_comments (incident_id, created_at)`,
+    },
   ],
   { table: "blameless_migrations" },
 );

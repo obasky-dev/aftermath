@@ -135,6 +135,71 @@ try {
     `status ${approval.status}`,
   );
 
+  const comment = await call("/_agent-native/actions/add-incident-comment", {
+    method: "POST",
+    body: JSON.stringify({
+      incidentId: seed.id,
+      body: "Verify: the pool saturation lines up with the corrected deploy.",
+    }),
+  });
+  const commentId = comment.json?.id;
+  check(
+    "comments are added",
+    comment.status === 200 && Boolean(commentId),
+    commentId ?? "no id",
+  );
+  const comments = await call(
+    `/_agent-native/actions/list-incident-comments?incidentId=${encodeURIComponent(seed.id)}`,
+  );
+  check(
+    "comments are listed",
+    (comments.json?.comments ?? []).some((row) => row.id === commentId),
+    `${comments.json?.comments?.length ?? 0} comments`,
+  );
+  if (commentId) {
+    await call("/_agent-native/actions/delete-incident-comment", {
+      method: "DELETE",
+      body: JSON.stringify({ id: commentId }),
+    });
+  }
+
+  const share = await call("/_agent-native/actions/create-postmortem-share", {
+    method: "POST",
+    body: JSON.stringify({ id: seed.id }),
+  });
+  const sharePath = share.json?.path;
+  check(
+    "a public share link is created",
+    share.status === 200 && typeof sharePath === "string" && sharePath.startsWith("/share/"),
+    sharePath ?? "no path",
+  );
+  if (typeof sharePath === "string") {
+    const publicPage = await fetch(`${BASE}${sharePath}`);
+    const html = await publicPage.text();
+    check(
+      "the shared postmortem loads without a session",
+      publicPage.status === 200 &&
+        html.includes("Checkout latency spike") &&
+        html.includes("Discussion"),
+      `${publicPage.status} · ${html.length} bytes`,
+    );
+  }
+
+  const filtered = await call(
+    "/_agent-native/actions/list-incidents?search=checkout&severity=sev2&status=resolved",
+  );
+  check(
+    "search and filters narrow the list",
+    filtered.json?.incidents?.length === 1,
+    `${filtered.json?.incidents?.length ?? 0} results`,
+  );
+  const emptySearch = await call("/_agent-native/actions/list-incidents?search=zzzz");
+  check(
+    "search can return nothing",
+    emptySearch.json?.incidents?.length === 0,
+    `${emptySearch.json?.incidents?.length ?? 0} results`,
+  );
+
   const pack = [
     "2026-11-02 09:00 [alert] disk full on node-3 | node-exporter",
     "09:01 [error] writes fail with ENOSPC | app logs",

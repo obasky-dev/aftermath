@@ -3,7 +3,7 @@ import { registerAuthPublicPaths } from "@agent-native/core/server";
 // The alert webhook authenticates with its own per-install token, checked in
 // server/routes/api/ingest-alert.post.ts. Registration runs at module load so
 // the auth guard admits the route before the handler verifies the token.
-registerAuthPublicPaths(["/api/ingest-alert"]);
+registerAuthPublicPaths(["/api/ingest-alert", "/share/:token"]);
 
 export default function registerAlertWebhookPublicPath() {
   return undefined;

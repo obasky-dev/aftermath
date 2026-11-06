@@ -1,6 +1,6 @@
 import { sendToAgentChat } from "@agent-native/core/client/agent-chat";
 import { useActionMutation } from "@agent-native/core/client/hooks";
-import { IconArrowLeft, IconSparkles } from "@tabler/icons-react";
+import { IconArrowLeft, IconFileUpload, IconSparkles } from "@tabler/icons-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 
@@ -57,6 +57,12 @@ export default function NewIncidentRoute() {
     }
   }
 
+  async function openFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (file) setPack(await file.text());
+    event.target.value = "";
+  }
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-4xl px-6 py-12">
@@ -86,9 +92,21 @@ export default function NewIncidentRoute() {
             >
               Operational pack
             </label>
-            <Button variant="ghost" size="sm" onClick={() => setPack(SAMPLE_PACK)}>
-              Use the sample pack
-            </Button>
+            <div className="flex items-center gap-1">
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
+                <IconFileUpload className="size-3.5" strokeWidth={2} />
+                Open a file
+                <input
+                  type="file"
+                  accept=".txt,.csv,.log,.md"
+                  className="sr-only"
+                  onChange={openFile}
+                />
+              </label>
+              <Button variant="ghost" size="sm" onClick={() => setPack(SAMPLE_PACK)}>
+                Use the sample pack
+              </Button>
+            </div>
           </div>
           <textarea
             id="pack"

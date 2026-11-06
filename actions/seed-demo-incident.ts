@@ -250,6 +250,14 @@ export default defineAction({
       });
     }
 
+    await db.insert(schema.incidentComments).values({
+      id: newId("cmt"),
+      incidentId,
+      body: "Linked the deploy diff; the retry path is the only change that touches payments.",
+      author: ctx?.userEmail ?? "dev@local.test",
+      ...owner,
+    });
+
     return {
       incidentId,
       created: true,

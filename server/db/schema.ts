@@ -16,6 +16,7 @@ export const incidents = pgTable("incidents", {
   summary: text("summary"),
   customerStatus: text("customer_status"),
   postmortemApprovedAt: text("postmortem_approved_at"),
+  shareToken: text("share_token"),
   ...ownableColumns(),
   createdAt: text("created_at")
     .notNull()
@@ -61,6 +62,18 @@ export const incidentActionItems = pgTable("incident_action_items", {
   owner: text("owner"),
   dueAt: text("due_at"),
   status: text("status").notNull().default("open"),
+  ...ownableColumns(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`now()`),
+});
+
+export const incidentComments = pgTable("incident_comments", {
+  id: text("id").primaryKey(),
+  incidentId: text("incident_id").notNull(),
+  eventId: text("event_id"),
+  body: text("body").notNull(),
+  author: text("author").notNull().default(""),
   ...ownableColumns(),
   createdAt: text("created_at")
     .notNull()

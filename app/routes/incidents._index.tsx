@@ -6,10 +6,11 @@ import {
   IconCircleCheck,
   IconCopy,
   IconAlertTriangle,
+  IconSearch,
   IconWebhook,
 } from "@tabler/icons-react";
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 
 import { Button } from "@/components/ui/button";
 
@@ -28,16 +29,41 @@ export function meta() {
 }
 
 export default function IncidentsIndex() {
-  const { data, isLoading, refetch } = useActionQuery("list-incidents", { limit: 25 });
+  const [params, setParams] = useSearchParams();
+  const q = params.get("q") ?? "";
+  const severity = (params.get("severity") ?? "") as "" | "sev1" | "sev2" | "sev3";
+  const status = (params.get("status") ?? "") as "" | "open" | "resolved";
+
+  const listArgs = {
+    limit: 25,
+    ...(q ? { search: q } : {}),
+    ...(severity ? { severity } : {}),
+    ...(status ? { status } : {}),
+  };
+  const { data, isLoading, refetch } = useActionQuery("list-incidents", listArgs);
+  const demoQuery = useActionQuery("list-incidents", { limit: 100 });
   const seed = useActionMutation("seed-demo-incident");
   const installWebhook = useActionMutation("install-alert-webhook");
   const [automation, setAutomation] = useState<{ path: string; token: string } | null>(null);
   const [curlCopied, setCurlCopied] = useState(false);
   const [testState, setTestState] = useState<"idle" | "sending" | "done" | "error">("idle");
   const incidents = data?.incidents ?? [];
+  const demoIncidents = demoQuery.data?.incidents ?? [];
   const demo =
-    incidents.find((incident) => incident.title === "Checkout latency spike") ??
-    incidents[0];
+    demoIncidents.find((incident) => incident.title === "Checkout latency spike") ??
+    demoIncidents[0];
+  const filtering = Boolean(q || severity || status);
+
+  function setFilter(key: "q" | "severity" | "status", value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
+  }
+
+  function clearFilters() {
+    setParams(new URLSearchParams(), { replace: true });
+  }
 
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const curl = automation
@@ -235,6 +261,45 @@ export default function IncidentsIndex() {
             </span>
           </div>
 
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[220px] flex-1">
+              <IconSearch
+                className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+                strokeWidth={2}
+              />
+              <input
+                value={q}
+                onChange={(event) => setFilter("q", event.target.value)}
+                placeholder="Search title or summary"
+                className="h-9 w-full rounded-sm border border-border bg-background pl-8 pr-2 text-sm text-foreground outline-none focus:border-primary/60"
+              />
+            </div>
+            <select
+              value={severity}
+              onChange={(event) => setFilter("severity", event.target.value)}
+              className="h-9 rounded-sm border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary/60"
+            >
+              <option value="">All severities</option>
+              <option value="sev1">sev1</option>
+              <option value="sev2">sev2</option>
+              <option value="sev3">sev3</option>
+            </select>
+            <select
+              value={status}
+              onChange={(event) => setFilter("status", event.target.value)}
+              className="h-9 rounded-sm border border-border bg-background px-2 text-sm text-foreground outline-none focus:border-primary/60"
+            >
+              <option value="">All statuses</option>
+              <option value="open">open</option>
+              <option value="resolved">resolved</option>
+            </select>
+            {filtering ? (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                Clear
+              </Button>
+            ) : null}
+          </div>
+
           {isLoading ? (
             <div className="mt-4 space-y-3">
               {[0, 1].map((index) => (
@@ -245,23 +310,39 @@ export default function IncidentsIndex() {
               ))}
             </div>
           ) : incidents.length === 0 ? (
-            <div className="mt-4 rounded-md border border-dashed border-border p-10 text-center">
-              <IconAlertTriangle
-                className="mx-auto size-7 text-muted-foreground"
-                strokeWidth={1.5}
-              />
-              <p className="mt-4 text-base font-medium">No incidents yet</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Load the seeded incident to see the correction.
-              </p>
-              <Button
-                className="mt-5"
-                onClick={() => seed.mutate({})}
-                disabled={seed.isPending}
-              >
-                {seed.isPending ? "Loading…" : "Load demo incident"}
-              </Button>
-            </div>
+            filtering ? (
+              <div className="mt-4 rounded-md border border-dashed border-border p-10 text-center">
+                <IconSearch
+                  className="mx-auto size-7 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <p className="mt-4 text-base font-medium">No incidents match these filters</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Try a different search, or clear the filters.
+                </p>
+                <Button className="mt-5" variant="outline" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-md border border-dashed border-border p-10 text-center">
+                <IconAlertTriangle
+                  className="mx-auto size-7 text-muted-foreground"
+                  strokeWidth={1.5}
+                />
+                <p className="mt-4 text-base font-medium">No incidents yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Load the seeded incident to see the correction.
+                </p>
+                <Button
+                  className="mt-5"
+                  onClick={() => seed.mutate({})}
+                  disabled={seed.isPending}
+                >
+                  {seed.isPending ? "Loading…" : "Load demo incident"}
+                </Button>
+              </div>
+            )
           ) : (
             <ul className="mt-4 divide-y divide-border border-y border-border">
               {incidents.map((incident) => (

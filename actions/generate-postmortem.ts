@@ -1,17 +1,11 @@
-import { defineAction, fail } from "@agent-native/core/action";
-import { asc, eq, inArray } from "drizzle-orm";
+import { defineAction } from "@agent-native/core/action";
 import { z } from "zod";
 
-import { analyzeIncident } from "../server/lib/analysis.js";
-import { getDb, schema } from "../server/db/index.js";
-
-function fmt(iso: string | null) {
-  return iso ? `${iso.slice(11, 16)} UTC` : "—";
-}
+import { buildPostmortem } from "../server/lib/postmortem.js";
 
 export default defineAction({
   description:
-    "Generate the current postmortem as Markdown. It cites the corrected timeline, the verdict it produces, the evidence and the action items. Read-only; approving is a separate owner-only action.",
+    "Generate the current postmortem as Markdown. It cites the corrected timeline, the verdict it produces, the evidence, the discussion and the action items. Read-only; approving is a separate owner-only action.",
   schema: z.object({
     id: z.string().describe("Incident id from list-incidents"),
   }),
@@ -23,155 +17,5 @@ export default defineAction({
     approvedAt: z.string().nullable(),
     verdict: z.string(),
   }),
-  run: async ({ id }) => {
-    const { incidents, incidentEvents, incidentEvidence, incidentActionItems } = schema;
-    const [incident] = await getDb()
-      .select()
-      .from(incidents)
-      .where(eq(incidents.id, id))
-      .limit(1);
-    if (!incident) {
-      fail("Incident not found.", { errorCode: "not_found", statusCode: 404 });
-    }
-
-    const events = await getDb()
-      .select({
-        id: incidentEvents.id,
-        at: incidentEvents.at,
-        originalAt: incidentEvents.originalAt,
-        kind: incidentEvents.kind,
-        title: incidentEvents.title,
-        source: incidentEvents.source,
-        confidence: incidentEvents.confidence,
-        isRootCause: incidentEvents.isRootCause,
-      })
-      .from(incidentEvents)
-      .where(eq(incidentEvents.incidentId, id))
-      .orderBy(asc(incidentEvents.at));
-
-    const eventIds = events.map((event) => event.id);
-    const evidence =
-      eventIds.length > 0
-        ? await getDb()
-            .select({
-              label: incidentEvidence.label,
-              url: incidentEvidence.url,
-              snippet: incidentEvidence.snippet,
-              eventId: incidentEvidence.eventId,
-            })
-            .from(incidentEvidence)
-            .where(inArray(incidentEvidence.eventId, eventIds))
-        : [];
-
-    const actionItems = await getDb()
-      .select()
-      .from(incidentActionItems)
-      .where(eq(incidentActionItems.incidentId, id))
-      .orderBy(asc(incidentActionItems.createdAt));
-
-    const analysis = await analyzeIncident(id, "current");
-    const corrected = events.filter(
-      (event) => event.originalAt !== null && event.originalAt !== event.at,
-    );
-
-    const impact = analysis.impactWindow
-      ? `${analysis.impactWindow.minutes ?? "?"} minutes, from ${fmt(analysis.impactWindow.start)} to ${fmt(analysis.impactWindow.end)}.`
-      : "Unknown.";
-
-    const timeline = events
-      .map((event) => {
-        const source = event.source ? ` — _${event.source}_` : "";
-        const correctedMark = corrected.some((row) => row.id === event.id)
-          ? ` (corrected from ${fmt(event.originalAt)})`
-          : "";
-        const cause = event.isRootCause ? " **[suspected cause]**" : "";
-        return `- **${fmt(event.at)}** — ${event.title}${source}${cause}${correctedMark}`;
-      })
-      .join("\n");
-
-    const findings = analysis.findings
-      .map((finding) => `- **${finding.title}.** ${finding.detail}`)
-      .join("\n");
-
-    const evidenceList =
-      evidence.length > 0
-        ? evidence
-            .map((row) => {
-              const url = row.url ? ` — ${row.url}` : "";
-              const snippet = row.snippet ? `: ${row.snippet}` : "";
-              return `- ${row.label}${snippet}${url}`;
-            })
-            .join("\n")
-        : "No evidence attached.";
-
-    const changes =
-      actionItems.length > 0
-        ? actionItems
-            .map(
-              (item) =>
-                `- [${item.status === "done" ? "x" : " "}] ${item.title} (${item.owner ?? "unassigned"})`,
-            )
-            .join("\n")
-        : "No action items yet.";
-
-    const corrections =
-      corrected.length > 0
-        ? corrected
-            .map(
-              (event) =>
-                `- "${event.title}": originally ${fmt(event.originalAt)}, corrected to ${fmt(event.at)}.`,
-            )
-            .join("\n")
-        : "No corrections were made to this timeline.";
-
-    const markdown = `# ${incident.title}
-
-**Severity:** ${incident.severity.toUpperCase()} · **Status:** ${incident.status} · **Started:** ${fmt(incident.startedAt)} · **Resolved:** ${fmt(incident.resolvedAt)}
-
-## Summary
-
-${analysis.summaryLine}
-
-## Initial account
-
-${incident.summary ?? "No initial account recorded."}
-
-## Impact
-
-${impact}
-
-## What happened
-
-${timeline}
-
-## Cause analysis
-
-**Verdict: ${analysis.verdict.toUpperCase()}.** ${analysis.summaryLine}
-
-${findings}
-
-## Evidence
-
-${evidenceList}
-
-## What we are changing
-
-${changes}
-
-## Correction log
-
-${corrections}
-
----
-
-_Generated by Aftermath from the timeline above. The verdict is computed, not narrated._
-`;
-
-    return {
-      title: incident.title,
-      markdown,
-      approvedAt: incident.postmortemApprovedAt,
-      verdict: analysis.verdict,
-    };
-  },
+  run: async ({ id }) => buildPostmortem(id),
 });
