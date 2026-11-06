@@ -78,6 +78,11 @@ export interface ConnectionView extends ProviderDefinition {
   inbound: boolean;
 }
 
+type Owner = {
+  userEmail?: string | null | undefined;
+  orgId?: string | null | undefined;
+};
+
 export async function listConnections() {
   const rows = await getDb().select().from(schema.integrationState);
   const byProvider = new Map(rows.map((row) => [row.provider, row]));
@@ -115,7 +120,7 @@ async function recordDelivery(input: {
   event: string;
   status: string;
   incidentId?: string | null;
-  owner?: { userEmail?: string | null; orgId?: string | null };
+  owner?: Owner;
 }) {
   const at = new Date().toISOString();
   const id = newId("dlv");
@@ -136,12 +141,9 @@ function definition(provider: string) {
   return PROVIDERS.find((candidate) => candidate.id === provider) ?? null;
 }
 
-export async function connectProvider(
-  provider: string,
-  owner: { userEmail?: string | null; orgId?: string | null },
-) {
+export async function connectProvider(provider: string, owner: Owner) {
   const found = definition(provider);
-  if (!found) return { ok: false, error: "Unknown provider" };
+  if (!found) throw new Error("Unknown provider");
   const lastChecked = new Date().toISOString();
   await getDb()
     .insert(schema.integrationState)
@@ -168,7 +170,7 @@ export async function connectProvider(
 
 export async function disconnectProvider(provider: string) {
   const found = definition(provider);
-  if (!found) return { ok: false, error: "Unknown provider" };
+  if (!found) throw new Error("Unknown provider");
   const lastChecked = new Date().toISOString();
   await getDb()
     .update(schema.integrationState)
@@ -184,7 +186,7 @@ export async function disconnectProvider(provider: string) {
 
 export async function testProvider(provider: string) {
   const found = definition(provider);
-  if (!found) return { ok: false, error: "Unknown provider" };
+  if (!found) throw new Error("Unknown provider");
   const delivery = await recordDelivery({
     provider,
     event: "connection.test",
@@ -196,19 +198,19 @@ export async function testProvider(provider: string) {
 export async function sendFixture(
   provider: string,
   incidentId: string,
-  owner: { userEmail?: string | null; orgId?: string | null },
+  owner: Owner,
 ) {
   const found = definition(provider);
   const fixture = FIXTURES[provider];
-  if (!found) return { ok: false, error: "Unknown provider" };
-  if (!fixture) return { ok: false, error: "This provider is outbound only" };
+  if (!found) throw new Error("Unknown provider");
+  if (!fixture) throw new Error("This provider is outbound only");
 
   const [incident] = await getDb()
     .select({ id: schema.incidents.id })
     .from(schema.incidents)
     .where(eq(schema.incidents.id, incidentId))
     .limit(1);
-  if (!incident) return { ok: false, error: "Incident not found" };
+  if (!incident) throw new Error("Incident not found");
 
   const at = new Date().toISOString();
   const eventId = newId("evt");

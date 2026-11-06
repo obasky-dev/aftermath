@@ -90,9 +90,10 @@ export default function ConnectionsRoute() {
   ) {
     setBusy(provider);
     setMessage(null);
-    (mutation.mutate as (input: Record<string, unknown>, options: Record<string, unknown>) => void)(
-      variables,
-      {
+    (mutation.mutate as unknown as (
+      input: Record<string, unknown>,
+      options: Record<string, unknown>,
+    ) => void)(variables, {
         onSuccess: () => {
           setBusy(null);
           setMessage(success);

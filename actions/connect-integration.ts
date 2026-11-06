@@ -23,12 +23,9 @@ export default defineAction({
       at: z.string(),
     }),
   }),
-  run: async ({ provider }, ctx) => {
-    const result = await connectProvider(provider, {
+  run: async ({ provider }, ctx) =>
+    connectProvider(provider, {
       userEmail: ctx?.userEmail,
       orgId: ctx?.orgId,
-    });
-    if (!result.ok) throw new Error(result.error);
-    return result;
-  },
+    }),
 });

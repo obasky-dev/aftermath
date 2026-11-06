@@ -22,9 +22,5 @@ export default defineAction({
       at: z.string(),
     }),
   }),
-  run: async ({ provider }) => {
-    const result = await disconnectProvider(provider);
-    if (!result.ok) throw new Error(result.error);
-    return result;
-  },
+  run: async ({ provider }) => disconnectProvider(provider),
 });

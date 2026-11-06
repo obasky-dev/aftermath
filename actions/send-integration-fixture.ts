@@ -24,12 +24,9 @@ export default defineAction({
       incidentId: z.string().nullable(),
     }),
   }),
-  run: async ({ provider, incidentId }, ctx) => {
-    const result = await sendFixture(provider, incidentId, {
+  run: async ({ provider, incidentId }, ctx) =>
+    sendFixture(provider, incidentId, {
       userEmail: ctx?.userEmail,
       orgId: ctx?.orgId,
-    });
-    if (!result.ok) throw new Error(result.error);
-    return result;
-  },
+    }),
 });
