@@ -29,7 +29,7 @@ export async function startIngestRun(
   owner: Owner,
 ) {
   const [incident] = await getDb()
-    .select({ id: schema.incidents.id })
+    .select({ id: schema.incidents.id, ownerEmail: schema.incidents.ownerEmail })
     .from(schema.incidents)
     .where(eq(schema.incidents.id, incidentId))
     .limit(1);
@@ -52,7 +52,16 @@ export async function startIngestRun(
 
 export async function processIngestRun(id: string) {
   const [run] = await getDb()
-    .select()
+    .select({
+      id: schema.ingestRuns.id,
+      incidentId: schema.ingestRuns.incidentId,
+      status: schema.ingestRuns.status,
+      stage: schema.ingestRuns.stage,
+      progress: schema.ingestRuns.progress,
+      bundle: schema.ingestRuns.bundle,
+      ownerEmail: schema.ingestRuns.ownerEmail,
+      orgId: schema.ingestRuns.orgId,
+    })
     .from(schema.ingestRuns)
     .where(eq(schema.ingestRuns.id, id))
     .limit(1);
@@ -115,7 +124,10 @@ export async function processIngestRun(id: string) {
 export async function resumeIngestRuns() {
   try {
     const rows = await getDb()
-      .select({ id: schema.ingestRuns.id })
+      .select({
+        id: schema.ingestRuns.id,
+        ownerEmail: schema.ingestRuns.ownerEmail,
+      })
       .from(schema.ingestRuns)
       .where(eq(schema.ingestRuns.status, "running"));
     for (const row of rows) {
