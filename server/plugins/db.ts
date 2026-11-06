@@ -144,6 +144,25 @@ CREATE TABLE IF NOT EXISTS integration_deliveries (
 );
 CREATE INDEX IF NOT EXISTS integration_deliveries_provider_idx ON integration_deliveries (provider, at DESC)`,
     },
+    {
+      version: 7,
+      name: "durable-ingest-runs",
+      sql: `CREATE TABLE IF NOT EXISTS ingest_runs (
+  id TEXT PRIMARY KEY,
+  incident_id TEXT NOT NULL REFERENCES incidents(id),
+  status TEXT NOT NULL DEFAULT 'running',
+  stage TEXT NOT NULL DEFAULT 'queued',
+  progress INTEGER NOT NULL DEFAULT 0,
+  bundle TEXT NOT NULL,
+  error TEXT,
+  owner_email TEXT NOT NULL DEFAULT '',
+  org_id TEXT,
+  visibility TEXT NOT NULL DEFAULT 'private',
+  started_at TEXT NOT NULL DEFAULT (now()),
+  updated_at TEXT NOT NULL DEFAULT (now())
+);
+CREATE INDEX IF NOT EXISTS ingest_runs_status_idx ON ingest_runs (status, started_at)`,
+    },
   ],
   { table: "blameless_migrations" },
 );

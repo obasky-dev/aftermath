@@ -125,3 +125,20 @@ export const integrationDeliveries = pgTable("integration_deliveries", {
     .notNull()
     .default(sql`now()`),
 });
+
+export const ingestRuns = pgTable("ingest_runs", {
+  id: text("id").primaryKey(),
+  incidentId: text("incident_id").notNull(),
+  status: text("status").notNull().default("running"),
+  stage: text("stage").notNull().default("queued"),
+  progress: integer("progress").notNull().default(0),
+  bundle: text("bundle").notNull(),
+  error: text("error"),
+  ...ownableColumns(),
+  startedAt: text("started_at")
+    .notNull()
+    .default(sql`now()`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`now()`),
+});

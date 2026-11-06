@@ -556,6 +556,15 @@ function IncidentDetail({ id }: { id: string }) {
           </div>
         </section>
 
+        <DurableIngestCard
+          id={id}
+          onFinished={() => {
+            setChallengeOn(false);
+            refreshDerived();
+            void incidentQuery.refetch();
+          }}
+        />
+
         <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="space-y-6">
             <PostmortemPanel
@@ -589,6 +598,7 @@ function IncidentDetail({ id }: { id: string }) {
           </div>
 
           <aside className="space-y-7 print:hidden">
+            <RollbackTuner id={id} exposure={current?.exposure} />
             <section>
               <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Strongest signals
@@ -916,6 +926,215 @@ function HypothesesPanel({ hypotheses }: { hypotheses: HypothesisView[] }) {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+function DurableIngestCard({
+  id,
+  onFinished,
+}: {
+  id: string;
+  onFinished: () => void;
+}) {
+  const [bundle, setBundle] = useState(
+    `2026-11-04 14:12 [chat] Support confirms three refund requests | Slack #incidents
+2026-11-04 14:20 [log] Deploy pipeline paused after rollback | Vercel deployments`,
+  );
+  const [runId, setRunId] = useState<string | null>(null);
+  const start = useActionMutation("start-ingest");
+  const run = useActionQuery(
+    "get-ingest-run",
+    { id: runId ?? "none" },
+    { enabled: Boolean(runId), refetchInterval: runId ? 700 : false },
+  );
+  const status = run.data?.status ?? "idle";
+  const progress = run.data?.progress ?? 0;
+  const stage = run.data?.stage ?? "queued";
+  const stages = ["Log Analyst", "Pattern Analyst", "Comms Writer"];
+
+  useEffect(() => {
+    if (status === "complete") onFinished();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  function startRun() {
+    start.mutate(
+      { incidentId: id, bundle },
+      {
+        onSuccess: (result) => {
+          if (result?.runId) setRunId(result.runId);
+        },
+      },
+    );
+  }
+
+  return (
+    <section
+      className="mt-6 rounded-md border border-border bg-card p-5 print:hidden"
+      aria-label="Durable ingest"
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Durable ingest
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+          {status}
+        </span>
+      </div>
+      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+        Paste a bundle. The run parses it, recomputes the hypotheses and builds the
+        summaries; a run interrupted by a restart resumes from its last stage.
+      </p>
+      <textarea
+        value={bundle}
+        onChange={(event) => setBundle(event.target.value)}
+        rows={3}
+        disabled={status === "running"}
+        className="mt-3 w-full resize-y rounded-sm border border-border bg-background p-2 font-mono text-xs leading-relaxed text-foreground outline-none focus:border-primary/60 disabled:opacity-60"
+      />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button
+          size="sm"
+          onClick={startRun}
+          disabled={start.isPending || status === "running" || bundle.trim().length === 0}
+        >
+          {start.isPending || status === "running"
+            ? "Ingesting…"
+            : runId
+              ? "Run again"
+              : "Start ingest"}
+        </Button>
+        {run.data?.error ? (
+          <span className="text-xs text-destructive">{run.data.error}</span>
+        ) : null}
+      </div>
+
+      {run.data ? (
+        <div className="mt-4">
+          <ol className="flex flex-wrap items-center gap-3">
+            {stages.map((name, index) => {
+              const active = stage === name;
+              const done = status === "complete" || stages.indexOf(stage) > index;
+              return (
+                <li key={name} className="flex items-center gap-1.5">
+                  <span
+                    className={`size-1.5 rounded-full ${
+                      done
+                        ? "bg-emerald-600"
+                        : active
+                          ? "animate-pulse bg-primary"
+                          : "bg-muted-foreground/40"
+                    }`}
+                  />
+                  <span
+                    className={`font-mono text-[10px] uppercase tracking-[0.12em] ${
+                      active ? "text-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {name}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+            {stage} · {progress}%
+          </p>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function RollbackTuner({
+  id,
+  exposure,
+}: {
+  id: string;
+  exposure: AnalysisView["exposure"];
+}) {
+  const startMs = exposure?.start ? Date.parse(exposure.start) : null;
+  const endMs = exposure?.end ? Date.parse(exposure.end) : null;
+  const [value, setValue] = useState<number | null>(null);
+  const midpoint =
+    startMs !== null && endMs !== null ? Math.round((startMs + endMs) / 2) : null;
+  const atMs = value ?? midpoint;
+  const at = atMs !== null ? new Date(atMs).toISOString() : "";
+  const simulation = useActionQuery(
+    "simulate-rollback",
+    { id, at },
+    { enabled: Boolean(at) },
+  );
+
+  if (startMs === null || endMs === null || atMs === null) return null;
+  const data = simulation.data;
+  const baseline = data?.baselineMinutes ?? null;
+  const rollback = data?.rollbackMinutes ?? null;
+  const percent =
+    baseline && rollback !== null ? Math.round((rollback / baseline) * 100) : 0;
+
+  return (
+    <section aria-label="What-if rollback">
+      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        What if we rolled back earlier?
+      </h2>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        Move the rollback time. The exposure window is recomputed from the leading change,
+        not guessed.
+      </p>
+      <input
+        type="range"
+        min={startMs}
+        max={endMs}
+        step={60_000}
+        value={atMs}
+        onChange={(event) => setValue(Number(event.target.value))}
+        className="mt-3 w-full accent-[hsl(var(--primary))]"
+        aria-label="Hypothetical rollback time"
+      />
+      <p className="mt-1 font-mono text-[10px] tabular-nums text-muted-foreground">
+        {fmt(at)}
+      </p>
+      {data ? (
+        <>
+          <div className="mt-3 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="w-16 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+                Baseline
+              </span>
+              <div className="h-2 flex-1 rounded-sm bg-foreground/15" />
+              <span className="w-14 text-right font-mono text-[10px] tabular-nums">
+                {baseline} min
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-16 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+                Rollback
+              </span>
+              <div className="h-2 flex-1 rounded-sm bg-muted">
+                <div
+                  className="h-full rounded-sm bg-primary"
+                  style={{ width: `${percent}%` }}
+                />
+              </div>
+              <span className="w-14 text-right font-mono text-[10px] tabular-nums">
+                {rollback} min
+              </span>
+            </div>
+          </div>
+          <p className="mt-2 text-sm">
+            Saves <strong className="font-semibold">{data.savedMinutes} min</strong> of
+            exposure ({data.percentSaved}%).
+          </p>
+        </>
+      ) : null}
     </section>
   );
 }
