@@ -67,7 +67,6 @@ CREATE INDEX IF NOT EXISTS incident_action_items_incident_idx ON incident_action
       version: 2,
       name: "original-times-and-postmortem-approval",
       sql: `ALTER TABLE incident_events ADD COLUMN IF NOT EXISTS original_at TEXT;
-UPDATE incident_events SET original_at = at WHERE original_at IS NULL;
 ALTER TABLE incidents ADD COLUMN IF NOT EXISTS postmortem_approved_at TEXT`,
     },
     {

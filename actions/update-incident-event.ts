@@ -38,8 +38,21 @@ export default defineAction({
   }),
   run: async (args) => {
     const { incidentEvents } = schema;
+    const [existing] = await getDb()
+      .select({ at: incidentEvents.at, originalAt: incidentEvents.originalAt })
+      .from(incidentEvents)
+      .where(eq(incidentEvents.id, args.id))
+      .limit(1);
+    if (!existing) {
+      fail("Event not found.", { errorCode: "not_found", statusCode: 404 });
+    }
+
     const patch: Record<string, unknown> = {};
-    if (args.at !== undefined) patch.at = toIso(args.at, "at");
+    if (args.at !== undefined) {
+      patch.at = toIso(args.at, "at");
+      // The first correction preserves the time the timeline originally had.
+      if (existing.originalAt === null) patch.originalAt = existing.at;
+    }
     if (args.title !== undefined) patch.title = args.title;
     if (args.detail !== undefined) patch.detail = args.detail;
     if (args.confidence !== undefined) patch.confidence = args.confidence;
