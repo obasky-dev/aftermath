@@ -1058,7 +1058,7 @@ function RollbackTuner({
   exposure,
 }: {
   id: string;
-  exposure: AnalysisView["exposure"];
+  exposure: AnalysisView["exposure"] | undefined;
 }) {
   const startMs = exposure?.start ? Date.parse(exposure.start) : null;
   const endMs = exposure?.end ? Date.parse(exposure.end) : null;
