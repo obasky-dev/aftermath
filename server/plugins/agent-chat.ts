@@ -12,6 +12,7 @@ const INITIAL_TOOL_NAMES = [
   "list-incidents",
   "get-incident",
   "create-incident",
+  "create-incident-from-alert",
   "create-incident-from-pack",
   "add-incident-event",
   "update-incident-event",

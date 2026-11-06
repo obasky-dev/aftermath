@@ -173,6 +173,61 @@ try {
       importedId,
     );
   }
+
+  const installed = await call("/_agent-native/actions/install-alert-webhook", {
+    method: "POST",
+    body: JSON.stringify({ rotate: true }),
+  });
+  const alertToken = installed.json?.token;
+  check(
+    "alert webhook installs with a token",
+    installed.status === 200 && typeof alertToken === "string" && alertToken.length === 32,
+    alertToken ? `${alertToken.length} chars` : "no token",
+  );
+
+  const wrongToken = await fetch(`${BASE}/api/ingest-alert`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-aftermath-token": "wrong" },
+    body: JSON.stringify({ title: "should be rejected" }),
+  });
+  check("alert webhook rejects a wrong token", wrongToken.status === 401, `status ${wrongToken.status}`);
+
+  const alertResponse = await fetch(`${BASE}/api/ingest-alert`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-aftermath-token": String(alertToken),
+    },
+    body: JSON.stringify({
+      title: "Verify alert intake",
+      severity: "sev1",
+      source: "node-exporter",
+    }),
+  });
+  const alertJson = await alertResponse.json().catch(() => null);
+  const alertIncidentId = alertJson?.id;
+  check(
+    "alert webhook creates an incident",
+    alertResponse.status === 202 && Boolean(alertIncidentId) && alertJson?.severity === "sev1",
+    `${alertResponse.status} ${alertIncidentId ?? ""}`,
+  );
+
+  if (alertIncidentId) {
+    const alertDetail = await call(
+      `/_agent-native/actions/get-incident?id=${encodeURIComponent(alertIncidentId)}`,
+    );
+    check(
+      "alert incident keeps its source",
+      (alertDetail.json?.events ?? []).some(
+        (event) => event.source === "node-exporter",
+      ),
+      "source",
+    );
+    await call("/_agent-native/actions/delete-incident", {
+      method: "DELETE",
+      body: JSON.stringify({ id: alertIncidentId }),
+    });
+  }
 } finally {
   if (root) {
     await call("/_agent-native/actions/update-incident-event", {

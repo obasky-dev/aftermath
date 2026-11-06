@@ -1,5 +1,14 @@
 import { useActionMutation, useActionQuery } from "@agent-native/core/client/hooks";
-import { IconArrowRight, IconArrowUpRight, IconCircleCheck, IconAlertTriangle } from "@tabler/icons-react";
+import {
+  IconArrowRight,
+  IconArrowUpRight,
+  IconCheck,
+  IconCircleCheck,
+  IconCopy,
+  IconAlertTriangle,
+  IconWebhook,
+} from "@tabler/icons-react";
+import { useState } from "react";
 import { Link } from "react-router";
 
 import { Button } from "@/components/ui/button";
@@ -19,12 +28,74 @@ export function meta() {
 }
 
 export default function IncidentsIndex() {
-  const { data, isLoading } = useActionQuery("list-incidents", { limit: 25 });
+  const { data, isLoading, refetch } = useActionQuery("list-incidents", { limit: 25 });
   const seed = useActionMutation("seed-demo-incident");
+  const installWebhook = useActionMutation("install-alert-webhook");
+  const [automation, setAutomation] = useState<{ path: string; token: string } | null>(null);
+  const [curlCopied, setCurlCopied] = useState(false);
+  const [testState, setTestState] = useState<"idle" | "sending" | "done" | "error">("idle");
   const incidents = data?.incidents ?? [];
   const demo =
     incidents.find((incident) => incident.title === "Checkout latency spike") ??
     incidents[0];
+
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const curl = automation
+    ? `curl -X POST ${origin}${automation.path} \\\n  -H "content-type: application/json" \\\n  -H "x-aftermath-token: ${automation.token}" \\\n  -d '{"title":"p95 latency above 2s","severity":"sev2"}'`
+    : "";
+
+  function setUpAutomation() {
+    setTestState("idle");
+    installWebhook.mutate(
+      { rotate: false },
+      {
+        onSuccess: (result) => {
+          if (result?.token) {
+            setAutomation({ path: result.path, token: result.token });
+          }
+        },
+      },
+    );
+  }
+
+  async function copyCurl() {
+    if (!curl) return;
+    try {
+      await navigator.clipboard.writeText(curl);
+      setCurlCopied(true);
+      window.setTimeout(() => setCurlCopied(false), 1600);
+    } catch {
+      setCurlCopied(false);
+    }
+  }
+
+  async function sendTestAlert() {
+    if (!automation) return;
+    setTestState("sending");
+    try {
+      const response = await fetch(automation.path, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-aftermath-token": automation.token,
+        },
+        body: JSON.stringify({
+          title: "p95 latency above 2s",
+          severity: "sev2",
+          source: "Alertmanager",
+          detail: "Synthetic alert from the automation card",
+        }),
+      });
+      if (response.status === 202) {
+        setTestState("done");
+        await refetch();
+      } else {
+        setTestState("error");
+      }
+    } catch {
+      setTestState("error");
+    }
+  }
 
   return (
     <div className="h-full overflow-y-auto">
@@ -83,6 +154,76 @@ export default function IncidentsIndex() {
             body="The verdict and the postmortem are recomputed from the corrected timeline — not rewritten by hand."
           />
         </div>
+
+        <section
+          className="mt-10 rounded-md border border-border bg-card p-5"
+          aria-label="Alert automation"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl">
+              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">
+                Automation
+              </p>
+              <h2 className="font-display mt-1 text-2xl tracking-tight">
+                An alert opens an incident by itself.
+              </h2>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                POST to a token-protected webhook. The incident and its first event are
+                created immediately — no model call, no screen in the loop. The agent uses
+                the same action when a person reports an alert in chat.
+              </p>
+            </div>
+            {automation ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-700/30 bg-emerald-700/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-emerald-800 dark:text-emerald-400">
+                <IconWebhook className="size-3" strokeWidth={2} />
+                Webhook live
+              </span>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={setUpAutomation}
+                disabled={installWebhook.isPending}
+              >
+                {installWebhook.isPending ? "Setting up…" : "Set up alert webhook"}
+              </Button>
+            )}
+          </div>
+
+          {automation ? (
+            <div className="mt-4">
+              <pre className="overflow-x-auto rounded-sm border border-border bg-background p-3 font-mono text-[11px] leading-relaxed text-foreground">
+                {curl}
+              </pre>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={sendTestAlert}
+                  disabled={testState === "sending"}
+                >
+                  {testState === "sending" ? "Sending…" : "Send test alert"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={copyCurl}>
+                  {curlCopied ? (
+                    <IconCheck className="size-4" strokeWidth={2} />
+                  ) : (
+                    <IconCopy className="size-4" strokeWidth={1.8} />
+                  )}
+                  {curlCopied ? "Copied" : "Copy curl"}
+                </Button>
+                {testState === "done" ? (
+                  <span className="text-xs text-muted-foreground">
+                    Alert accepted — the new incident is in the list below.
+                  </span>
+                ) : null}
+                {testState === "error" ? (
+                  <span className="text-xs text-destructive">
+                    The webhook rejected the alert. Re-check the token and try again.
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </section>
 
         <section className="mt-14" aria-label="Incidents">
           <div className="flex items-baseline justify-between">

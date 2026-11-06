@@ -10,6 +10,8 @@ Built for the [Agent-Native Hackathon](https://www.builder.io/hackathon) on Buil
 
 ![Challenge panel with evidence-based objections](docs/screenshots/challenge.png)
 
+![Alert automation with a copyable curl command](docs/screenshots/automation.png)
+
 ---
 
 ## The problem
@@ -41,6 +43,19 @@ Open **Import a pack** (`/incidents/new`), paste what you actually have — aler
 
 Then challenge it. **Challenge this correction** runs `challenge-incident`: what the new time contradicts, which nearby signal now coincides, which claims are unverified, and the one question that would settle it. The agent can answer that question using the same timeline.
 
+## Automation
+
+The incidents page installs a **token-protected alert webhook**. POST an alert and the incident, plus its first event, are created immediately — no model call and no screen in the loop:
+
+```bash
+curl -X POST http://localhost:8080/api/ingest-alert \
+  -H "content-type: application/json" \
+  -H "x-aftermath-token: <token from Set up alert webhook>" \
+  -d '{"title":"p95 latency above 2s","severity":"sev2"}'
+```
+
+The same operation is the `create-incident-from-alert` action, so the agent can call it when a person reports an alert in chat. A wrong token returns **401**; the alert source is kept as the incident's first timeline event.
+
 ## Why this is agent-native
 
 - **One action, every surface.** `analyze-incident` is a typed function. The page calls it through a React hook, the agent calls it as a tool, and it is reachable over HTTP and the CLI. There is no second implementation of the verdict.
@@ -64,6 +79,7 @@ Then challenge it. **Challenge this correction** runs `challenge-incident`: what
 | `list-incidents` | Incidents, newest first |
 | `get-incident` | One incident with its timeline (current and original times) and action items |
 | `create-incident` | Create an incident |
+| `create-incident-from-alert` | Create an incident from an alert; also powers the inbound webhook |
 | `create-incident-from-pack` | Parse a pasted pack into a full timeline and store every event with its source |
 | `add-incident-event` | Add one event, for lines found in a conversation |
 | `update-incident-event` | Correct an event's time, title, detail, confidence or suspected-cause flag |
@@ -72,6 +88,7 @@ Then challenge it. **Challenge this correction** runs `challenge-incident`: what
 | `generate-postmortem` | The postmortem as Markdown, with a correction log |
 | `approve-postmortem` | Owner-only approval (UI capability required) |
 | `update-incident-action-item` | Mark an action item open or done |
+| `install-alert-webhook` | Return the alert webhook path and token (setup only; hidden from the model) |
 | `delete-incident` | Remove an incident and its children (cleanup; hidden from the model) |
 | `seed-demo-incident` | Load the demo incident (idempotent; hidden from the model) |
 
@@ -82,7 +99,7 @@ Then challenge it. **Challenge this correction** runs `challenge-incident`: what
 | `pnpm typecheck` | clean |
 | `pnpm agent-native:doctor` | clean, 14 guards |
 | `pnpm test` | 3 parser tests pass |
-| `pnpm verify:timeline` | **15/15 checks** against the running app over HTTP |
+| `pnpm verify:timeline` | **19/19 checks** against the running app over HTTP |
 | Original timeline | `consistent`, +1 minute, 28-minute impact window |
 | Deploy corrected +10 minutes | `contradicted`, 9 minutes before the failure |
 | Original timeline after the correction | still `consistent` — the before state is preserved |
@@ -90,6 +107,7 @@ Then challenge it. **Challenge this correction** runs `challenge-incident`: what
 | Challenge | 3 evidence-based objections and the settling question |
 | Approval from HTTP/CLI | refused with **403**: “can only be called from the signed-in app UI” |
 | Pack import | 3-line pack → 3 events, sources preserved, then cleaned up |
+| Alert webhook | installs with a 32-char token; a wrong token returns **401**; a valid alert returns **202** and creates a sev1 incident with its source |
 | Headless Chromium (end-to-end) | landing → demo → correction → contradicted → correction log → challenge → action-item toggle → reset → pack import → mark a cause → contradicted → cleanup; no console errors, no failed requests, no horizontal overflow |
 | Incident list and detail | HTTP 200 |
 
