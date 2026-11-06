@@ -144,6 +144,15 @@ No live provider credentials are connected in this build. The provider calls are
 | Alert webhook | 401 for a wrong token; 202 creates a sev1 incident with its source |
 | Incident list and detail | HTTP 200 |
 
+## Project docs
+
+- [DEMO.md](DEMO.md) — click-by-click recording script, timings and fallbacks
+- [ARCHITECTURE.md](ARCHITECTURE.md) — data model, deterministic engine, durability, limits
+- [FRAMEWORK_MAP.md](FRAMEWORK_MAP.md) — each framework primitive against its real API and status
+- [ORIGINALITY.md](ORIGINALITY.md) — pre-existing work versus what was built during the hackathon
+- [CREDENTIALS_NEEDED.md](CREDENTIALS_NEEDED.md) — what is missing for live integrations and deployment
+- [proof/FINAL.md](proof/FINAL.md) — verified, unverified and not built
+
 ## Run it locally
 
 Prerequisites: **Node.js 22.22+** and **pnpm**.
