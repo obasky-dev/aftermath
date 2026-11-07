@@ -52,7 +52,7 @@ jobs:
 
       - name: Start the app
         run: |
-          (pnpm exec agent-native dev > dev.log 2>&1 &)
+          (env -u CI pnpm exec agent-native dev > dev.log 2>&1 &)
           for i in $(seq 1 60); do
             if curl -sf --max-time 20 http://localhost:8080/incidents > /dev/null; then
               echo "app is up"

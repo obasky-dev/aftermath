@@ -19,6 +19,7 @@ async function call(path, init = {}) {
     ...init,
     headers: {
       ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(init.body ? { Origin: "http://localhost:8080" } : {}),
       ...(cookie ? { Cookie: cookie } : {}),
       ...(init.headers ?? {}),
     },
