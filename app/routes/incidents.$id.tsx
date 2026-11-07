@@ -175,6 +175,7 @@ function IncidentDetail({ id }: { id: string }) {
     [],
   );
   const [historyIndex, setHistoryIndex] = useState(0);
+  const [conflictVersion, setConflictVersion] = useState(0);
 
   const events = useMemo<EventRow[]>(() => {
     const rows = incidentQuery.data?.events ?? [];
@@ -207,6 +208,7 @@ function IncidentDetail({ id }: { id: string }) {
     void originalQuery.refetch();
     void currentQuery.refetch();
     void postmortemQuery.refetch();
+    setConflictVersion((version) => version + 1);
   }
 
   function sendMove(eventId: string, at: string) {
@@ -546,6 +548,7 @@ function IncidentDetail({ id }: { id: string }) {
 
         <ConflictQuestions
           id={id}
+          version={conflictVersion}
           onResolved={() => {
             refreshDerived();
             void incidentQuery.refetch();
@@ -1653,15 +1656,22 @@ interface ConflictCardView {
 
 function ConflictQuestions({
   id,
+  version,
   onResolved,
 }: {
   id: string;
+  version: number;
   onResolved: () => void;
 }) {
   const query = useActionQuery("list-conflicts", { id });
   const update = useActionMutation("update-incident-event");
   const [busy, setBusy] = useState<string | null>(null);
   const conflicts = (query.data?.conflicts ?? []) as ConflictCardView[];
+
+  useEffect(() => {
+    void query.refetch();
+    // A correction or a resolved conflict changes the open questions.
+  }, [version]);
 
   function resolve(card: ConflictCardView, option: ConflictOptionView) {
     if (!option.patch) {
