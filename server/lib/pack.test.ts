@@ -31,6 +31,43 @@ describe("parseIncidentPack", () => {
     expect(parsed.events.map((event) => event.kind)).toEqual(["deploy", "log", "error"]);
   });
 
+  it("turns WebVTT cues into timed chat events", () => {
+    const parsed = parseIncidentPack(
+      `WEBVTT
+
+00:14:02.000 --> 00:14:06.000
+Dave: the deploy is promoting now
+
+00:14:09.000 --> 00:14:13.000
+Sam: checkout errors are climbing`,
+      "2026-11-04",
+    );
+    expect(parsed.events).toHaveLength(2);
+    expect(parsed.events[0]).toMatchObject({
+      at: "2026-11-04T00:14:00.000Z",
+      kind: "chat",
+      source: "Transcript",
+    });
+    expect(parsed.events[1]?.title).toContain("checkout errors");
+  });
+
+  it("turns SRT cues with comma milliseconds into events", () => {
+    const parsed = parseIncidentPack(
+      `1
+00:09:15,000 --> 00:09:19,000
+On-call: rolling back the deploy
+
+2
+00:09:24,000 --> 00:09:28,000
+Error rate is falling`,
+      "2026-11-04",
+    );
+    expect(parsed.events.map((event) => event.at)).toEqual([
+      "2026-11-04T00:09:00.000Z",
+      "2026-11-04T00:09:00.000Z",
+    ]);
+  });
+
   it("skips lines without a time and honours explicit dates", () => {
     const parsed = parseIncidentPack(
       "no time here\n2026-11-03 09:15 [alert] disk full | node-exporter",

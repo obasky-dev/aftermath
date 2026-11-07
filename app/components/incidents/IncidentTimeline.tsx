@@ -230,7 +230,8 @@ export function IncidentTimeline({
     }
     element.addEventListener("wheel", onWheel, { passive: false });
     return () => element.removeEventListener("wheel", onWheel);
-  }, []);
+    // The track mounts only after the first events arrive, so re-attach then.
+  }, [range !== null]);
 
   if (!range || !view) {
     return (

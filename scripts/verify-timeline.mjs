@@ -95,9 +95,9 @@ try {
   );
 
   for (const [label, path, marker] of [
-    ["incident list page renders", "/incidents", "Move one event"],
-    ["connections page renders", "/connections", "Evidence"],
-    ["incident detail page renders", `/incidents/${encodeURIComponent(seed.id)}`, ""],
+    ["incident list page renders", "/incidents", "Incident postmortems"],
+    ["connections page renders", "/connections", "Connections — Aftermath"],
+    ["incident detail page renders", `/incidents/${encodeURIComponent(seed.id)}`, "Incident — Aftermath"],
   ]) {
     const pageResponse = await fetch(`${BASE}${path}`, { headers: { cookie } });
     const html = await pageResponse.text();

@@ -57,6 +57,36 @@ function inferKind(text: string): PackKind {
   return "note";
 }
 
+/**
+ * Normalizes WebVTT/SRT cues into the one-line pack format. The cue start time
+ * is the event time; the spoken text becomes a chat event. No date is invented:
+ * cues borrow the pack's date when it has one, otherwise today (UTC).
+ */
+function transcriptToPackLines(text: string): string {
+  if (!/-->\s*\d{2}:\d{2}:\d{2}/.test(text)) return text;
+  const lines = text.split(/\r?\n/);
+  const out: string[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const cue = lines[index]?.trim().match(
+      /^(\d{2}):(\d{2}):(\d{2})[.,]\d{3}\s+-->\s+/,
+    );
+    if (!cue) continue;
+    const [, hours, minutes] = cue;
+    const spoken: string[] = [];
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const line = lines[next]?.trim() ?? "";
+      if (!line) break;
+      if (/^\d{1,2}$/.test(line) || /-->\s*\d{2}:\d{2}:\d{2}/.test(line)) break;
+      spoken.push(line);
+      index = next;
+    }
+    const body = spoken.join(" ").trim();
+    if (!body) continue;
+    out.push(`${hours}:${minutes} [chat] ${body} | Transcript`);
+  }
+  return out.join("\n");
+}
+
 function dateFor(line: string, fallbackDate: string): string | null {
   const full = line.match(/(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})/);
   if (full) {
@@ -85,14 +115,15 @@ function dateFor(line: string, fallbackDate: string): string | null {
  * inferred from the words in the line. Everything is UTC.
  */
 export function parseIncidentPack(text: string, fallbackDate?: string): ParsedPack {
-  const explicitDate = text.match(/\b(\d{4}-\d{2}-\d{2})\b/)?.[1];
+  const normalized = transcriptToPackLines(text);
+  const explicitDate = normalized.match(/\b(\d{4}-\d{2}-\d{2})\b/)?.[1];
   const defaultDate =
     fallbackDate ?? explicitDate ?? new Date().toISOString().slice(0, 10);
   const events: ParsedEvent[] = [];
   let skipped = 0;
   const titleCandidates: string[] = [];
 
-  for (const raw of text.split(/\r?\n/)) {
+  for (const raw of normalized.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith("#") || line.startsWith("//")) continue;
 

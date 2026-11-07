@@ -27,7 +27,7 @@ That last line is the point. Most tools let you edit a timeline. Aftermath makes
 
 ## Bring your own incident
 
-Open **Import a pack** (`/incidents/new`), paste what you actually have — alerts, deploys, log lines, chat, one event per line — or open a `.txt`, `.csv`, `.log` or `.md` file — and press **Build timeline**. Times and sources are kept exactly as written; lines without a time are skipped, not guessed. Or hand the same pack to the agent: it calls `create-incident-from-pack` and builds the same timeline through the same action.
+Open **Import a pack** (`/incidents/new`), paste what you actually have — alerts, deploys, log lines, chat, one event per line — or open a `.txt`, `.csv`, `.log`, `.md`, `.vtt` or `.srt` file — and press **Build timeline**. Times and sources are kept exactly as written; WebVTT and SRT cues become chat events at their cue time; lines without a time are skipped, not guessed. Or hand the same pack to the agent: it calls `create-incident-from-pack` and builds the same timeline through the same action.
 
 ```text
 14:03 [error] 5xx rate climbs from 0.2% to 8.4% | Grafana

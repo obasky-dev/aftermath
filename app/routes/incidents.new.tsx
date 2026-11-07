@@ -98,7 +98,7 @@ export default function NewIncidentRoute() {
                 Open a file
                 <input
                   type="file"
-                  accept=".txt,.csv,.log,.md"
+                  accept=".txt,.csv,.log,.md,.vtt,.srt"
                   className="sr-only"
                   onChange={openFile}
                 />
