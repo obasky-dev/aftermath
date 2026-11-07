@@ -5,6 +5,8 @@
  *
  *   pnpm verify:timeline
  */
+import { createHmac } from "node:crypto";
+
 const BASE = process.argv[2] ?? "http://localhost:8080";
 
 let cookie = "";
@@ -98,7 +100,7 @@ try {
   const conflictsBefore = conflictsBeforeResponse.json?.conflicts ?? [];
   check(
     "conflict cards name both sides with resolutions",
-    conflictsBefore.length >= 2 &&
+    conflictsBefore.length >= 1 &&
       conflictsBefore.every(
         (conflict) =>
           Boolean(conflict.left?.eventId) &&
@@ -177,6 +179,16 @@ try {
     "the timing conflict closes after the correction",
     !conflictsAfter.some((conflict) => conflict.kind === "timing"),
     conflictsAfter.map((conflict) => conflict.kind).join(", ") || "none",
+  );
+  check(
+    "the contradiction appears as a causal conflict",
+    conflictsAfter.some(
+      (conflict) =>
+        conflict.kind === "causal" &&
+        /failover/i.test(conflict.left.label) &&
+        /flat/i.test(conflict.right.label),
+    ),
+    conflictsAfter.map((conflict) => conflict.left.label).join(", ") || "none",
   );
 
   const originalAgain = await call(
@@ -519,9 +531,13 @@ try {
   });
   const alertToken = installed.json?.token;
   check(
-    "alert webhook installs with a token",
-    installed.status === 200 && typeof alertToken === "string" && alertToken.length === 32,
-    alertToken ? `${alertToken.length} chars` : "no token",
+    "alert webhook installs with a token and signing secret",
+    installed.status === 200 &&
+      typeof alertToken === "string" &&
+      alertToken.length === 32 &&
+      typeof installed.json?.secret === "string" &&
+      installed.json.secret.length >= 32,
+    alertToken ? `${alertToken.length}-char token` : "no token",
   );
 
   const wrongToken = await fetch(`${BASE}/api/ingest-alert`, {
@@ -531,17 +547,19 @@ try {
   });
   check("alert webhook rejects a wrong token", wrongToken.status === 401, `status ${wrongToken.status}`);
 
+  const alertBody = JSON.stringify({
+    title: "Verify alert intake",
+    severity: "sev1",
+    source: "node-exporter",
+  });
   const alertResponse = await fetch(`${BASE}/api/ingest-alert`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "x-aftermath-token": String(alertToken),
+      "x-aftermath-delivery": "verify-alert-1",
     },
-    body: JSON.stringify({
-      title: "Verify alert intake",
-      severity: "sev1",
-      source: "node-exporter",
-    }),
+    body: alertBody,
   });
   const alertJson = await alertResponse.json().catch(() => null);
   const alertIncidentId = alertJson?.id;
@@ -549,6 +567,66 @@ try {
     "alert webhook creates an incident",
     alertResponse.status === 202 && Boolean(alertIncidentId) && alertJson?.severity === "sev1",
     `${alertResponse.status} ${alertIncidentId ?? ""}`,
+  );
+
+  const replayResponse = await fetch(`${BASE}/api/ingest-alert`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-aftermath-token": String(alertToken),
+      "x-aftermath-delivery": "verify-alert-1",
+    },
+    body: alertBody,
+  });
+  const replayJson = await replayResponse.json().catch(() => null);
+  check(
+    "a replayed delivery is idempotent",
+    replayResponse.status === 200 &&
+      replayJson?.duplicate === true &&
+      replayJson?.id === alertIncidentId,
+    `${replayResponse.status} ${replayJson?.duplicate ? "duplicate" : "new incident"}`,
+  );
+
+  const secret = installed.json?.secret;
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signedBody = JSON.stringify({
+    title: "Verify signed alert intake",
+    severity: "sev2",
+    source: "signed-source",
+  });
+  const signature = `sha256=${createHmac("sha256", String(secret))
+    .update(`${timestamp}.${signedBody}`)
+    .digest("hex")}`;
+  const signedResponse = await fetch(`${BASE}/api/ingest-alert`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-aftermath-timestamp": timestamp,
+      "x-aftermath-signature": signature,
+      "x-aftermath-delivery": "verify-alert-signed-1",
+    },
+    body: signedBody,
+  });
+  const signedJson = await signedResponse.json().catch(() => null);
+  check(
+    "a valid HMAC signature is accepted",
+    signedResponse.status === 202 && Boolean(signedJson?.id),
+    `${signedResponse.status} ${signedJson?.id ?? ""}`,
+  );
+
+  const staleResponse = await fetch(`${BASE}/api/ingest-alert`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-aftermath-timestamp": String(Math.floor(Date.now() / 1000) - 900),
+      "x-aftermath-signature": signature,
+    },
+    body: signedBody,
+  });
+  check(
+    "a stale signature is rejected",
+    staleResponse.status === 401,
+    `status ${staleResponse.status}`,
   );
 
   if (alertIncidentId) {
@@ -565,6 +643,12 @@ try {
     await call("/_agent-native/actions/delete-incident", {
       method: "DELETE",
       body: JSON.stringify({ id: alertIncidentId }),
+    });
+  }
+  if (signedJson?.id) {
+    await call("/_agent-native/actions/delete-incident", {
+      method: "DELETE",
+      body: JSON.stringify({ id: signedJson.id }),
     });
   }
 } finally {

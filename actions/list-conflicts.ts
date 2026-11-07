@@ -8,6 +8,7 @@ import { analyzeIncident, isChangeEvent } from "../server/lib/analysis.js";
 const eventRef = z.object({
   eventId: z.string(),
   label: z.string(),
+  title: z.string(),
   at: z.string(),
   detail: z.string().nullable(),
   source: z.string().nullable(),
@@ -40,7 +41,7 @@ function minutesBetween(laterIso: string, earlierIso: string) {
   return Math.round((Date.parse(laterIso) - Date.parse(earlierIso)) / 60_000);
 }
 
-const PROMOTION_CLAIM = /promot|deploy(ed|ing)?.*(now|prod)|rolled (back|out)|is live|shipped/i;
+const PROMOTION_CLAIM = /promot|deploy(ed|ing)?.*(now|prod)|is live|shipped/i;
 
 export default defineAction({
   description:
@@ -101,16 +102,19 @@ export default defineAction({
       if (!isChangeEvent(change)) continue;
       if (change.confidence >= 60) continue;
 
+      // Only the nearest claim about the same change counts. Falling through to
+      // a later log line (a rollback, a recovery) would invent a conflict that
+      // the correction cannot close.
       const claim = rows.find((candidate) => {
         if (candidate.id === change.id) return false;
         if (candidate.eventStatus === "red_herring") return false;
         if (!PROMOTION_CLAIM.test(`${candidate.title} ${candidate.detail ?? ""}`)) return false;
-        const delta = minutesBetween(candidate.at, change.at);
-        return delta >= 2 && delta <= 40;
+        return minutesBetween(candidate.at, change.at) >= 0;
       });
       if (!claim) continue;
 
       const delta = minutesBetween(claim.at, change.at);
+      if (delta < 2 || delta > 40) continue;
       conflicts.push({
         id: `timing:${change.id}:${claim.id}`,
         kind: "timing",
@@ -118,7 +122,8 @@ export default defineAction({
         question: `The record says ${fmt(change.at)} (${change.confidence}% confidence). ${claim.source ?? "A witness"} says ${fmt(claim.at)} (${claim.confidence}%). Which time should the timeline keep?`,
         left: {
           eventId: change.id,
-          label: change.source ?? "Timeline record",
+          label: change.title,
+          title: change.title,
           at: change.at,
           detail: change.detail,
           source: change.source,
@@ -126,7 +131,8 @@ export default defineAction({
         },
         right: {
           eventId: claim.id,
-          label: claim.source ?? "Witness claim",
+          label: claim.title,
+          title: claim.title,
           at: claim.at,
           detail: claim.detail,
           source: claim.source,
@@ -177,6 +183,7 @@ export default defineAction({
         left: {
           eventId: suspectEvent.id,
           label: suspectEvent.title,
+          title: suspectEvent.title,
           at: suspectEvent.at,
           detail: suspectEvent.detail,
           source: suspectEvent.source,
@@ -185,6 +192,7 @@ export default defineAction({
         right: {
           eventId: contradicting.id,
           label: contradicting.title,
+          title: contradicting.title,
           at: contradicting.at,
           detail: contradicting.detail,
           source: contradicting.source,

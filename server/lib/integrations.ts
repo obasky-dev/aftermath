@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { newId } from "./incidents.js";
 import { getDb, schema } from "../db/index.js";
@@ -115,11 +115,12 @@ export async function listConnections() {
   return { providers, coverage, connectedCount, total: providers.length };
 }
 
-async function recordDelivery(input: {
+export async function recordDelivery(input: {
   provider: string;
   event: string;
   status: string;
   incidentId?: string | null;
+  deliveryKey?: string | null;
   owner?: Owner;
 }) {
   const at = new Date().toISOString();
@@ -131,10 +132,38 @@ async function recordDelivery(input: {
     status: input.status,
     at,
     incidentId: input.incidentId ?? null,
+    deliveryKey: input.deliveryKey ?? null,
     ownerEmail: input.owner?.userEmail ?? "",
     orgId: input.owner?.orgId ?? null,
   });
-  return { id, provider: input.provider, event: input.event, status: input.status, at, incidentId: input.incidentId ?? null };
+  return {
+    id,
+    provider: input.provider,
+    event: input.event,
+    status: input.status,
+    at,
+    incidentId: input.incidentId ?? null,
+    deliveryKey: input.deliveryKey ?? null,
+  };
+}
+
+export async function findDeliveryByKey(provider: string, deliveryKey: string) {
+  const [row] = await getDb()
+    .select({
+      id: schema.integrationDeliveries.id,
+      incidentId: schema.integrationDeliveries.incidentId,
+      status: schema.integrationDeliveries.status,
+      at: schema.integrationDeliveries.at,
+    })
+    .from(schema.integrationDeliveries)
+    .where(
+      and(
+        eq(schema.integrationDeliveries.provider, provider),
+        eq(schema.integrationDeliveries.deliveryKey, deliveryKey),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
 }
 
 function definition(provider: string) {

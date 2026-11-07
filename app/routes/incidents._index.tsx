@@ -44,9 +44,16 @@ export default function IncidentsIndex() {
   const demoQuery = useActionQuery("list-incidents", { limit: 100 });
   const seed = useActionMutation("seed-demo-incident");
   const installWebhook = useActionMutation("install-alert-webhook");
-  const [automation, setAutomation] = useState<{ path: string; token: string } | null>(null);
+  const [automation, setAutomation] = useState<{
+    path: string;
+    token: string;
+    secret: string;
+  } | null>(null);
   const [curlCopied, setCurlCopied] = useState(false);
-  const [testState, setTestState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [testState, setTestState] = useState<
+    "idle" | "sending" | "done" | "duplicate" | "error"
+  >("idle");
+  const [lastDeliveryId, setLastDeliveryId] = useState<string | null>(null);
   const incidents = data?.incidents ?? [];
   const demoIncidents = demoQuery.data?.incidents ?? [];
   const demo =
@@ -77,7 +84,11 @@ export default function IncidentsIndex() {
       {
         onSuccess: (result) => {
           if (result?.token) {
-            setAutomation({ path: result.path, token: result.token });
+            setAutomation({
+              path: result.path,
+              token: result.token,
+              secret: result.secret ?? "",
+            });
           }
         },
       },
@@ -95,15 +106,22 @@ export default function IncidentsIndex() {
     }
   }
 
-  async function sendTestAlert() {
+  async function sendTestAlert(replay = false) {
     if (!automation) return;
     setTestState("sending");
+    const deliveryId =
+      replay && lastDeliveryId
+        ? lastDeliveryId
+        : typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `delivery-${Date.now()}`;
     try {
       const response = await fetch(automation.path, {
         method: "POST",
         headers: {
           "content-type": "application/json",
           "x-aftermath-token": automation.token,
+          "x-aftermath-delivery": deliveryId,
         },
         body: JSON.stringify({
           title: "p95 latency above 2s",
@@ -112,12 +130,13 @@ export default function IncidentsIndex() {
           detail: "Synthetic alert from the automation card",
         }),
       });
-      if (response.status === 202) {
-        setTestState("done");
-        await refetch();
-      } else {
-        setTestState("error");
-      }
+      const payload = (await response.json().catch(() => null)) as
+        | { duplicate?: boolean }
+        | null;
+      setLastDeliveryId(deliveryId);
+      if (payload?.duplicate) setTestState("duplicate");
+      else setTestState(response.ok ? "done" : "error");
+      void refetch();
     } catch {
       setTestState("error");
     }
@@ -194,9 +213,11 @@ export default function IncidentsIndex() {
                 An alert opens an incident by itself.
               </h2>
               <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                POST to a token-protected webhook. The incident and its first event are
-                created immediately — no model call, no screen in the loop. The agent uses
-                the same action when a person reports an alert in chat.
+                POST to a token- or signature-protected webhook. The incident and its first
+                event are created immediately — no model call, no screen in the loop. Send
+                an <code className="font-mono text-[11px]">x-aftermath-delivery</code> id
+                and a replay is ignored instead of opening a duplicate. The agent uses the
+                same action when a person reports an alert in chat.
               </p>
             </div>
             {automation ? (
@@ -223,11 +244,21 @@ export default function IncidentsIndex() {
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
-                  onClick={sendTestAlert}
+                  onClick={() => sendTestAlert()}
                   disabled={testState === "sending"}
                 >
                   {testState === "sending" ? "Sending…" : "Send test alert"}
                 </Button>
+                {lastDeliveryId ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => sendTestAlert(true)}
+                    disabled={testState === "sending"}
+                  >
+                    Replay the same delivery
+                  </Button>
+                ) : null}
                 <Button size="sm" variant="outline" onClick={copyCurl}>
                   {curlCopied ? (
                     <IconCheck className="size-4" strokeWidth={2} />
@@ -241,12 +272,38 @@ export default function IncidentsIndex() {
                     Alert accepted — the new incident is in the list below.
                   </span>
                 ) : null}
+                {testState === "duplicate" ? (
+                  <span className="text-xs text-muted-foreground">
+                    Replay ignored — the delivery id was already accepted, so no duplicate
+                    incident opened.
+                  </span>
+                ) : null}
                 {testState === "error" ? (
                   <span className="text-xs text-destructive">
                     The webhook rejected the alert. Re-check the token and try again.
                   </span>
                 ) : null}
               </div>
+              {automation.secret ? (
+                <details className="mt-3 rounded-sm border border-border bg-background/60 p-3">
+                  <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    HMAC signature
+                  </summary>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    Send <code className="font-mono">x-aftermath-timestamp</code> (Unix
+                    seconds) and{" "}
+                    <code className="font-mono">
+                      x-aftermath-signature: sha256=HMAC_SHA256(secret, timestamp + "." +
+                      rawBody)
+                    </code>
+                    . Timestamps older than five minutes are rejected. The secret is
+                    stored with this install and never sent anywhere else.
+                  </p>
+                  <pre className="mt-2 overflow-x-auto rounded-sm bg-muted px-2 py-1 font-mono text-[10px]">
+                    {automation.secret}
+                  </pre>
+                </details>
+              ) : null}
             </div>
           ) : null}
         </section>

@@ -53,6 +53,7 @@ interface ConflictResult {
     left: {
       eventId: string;
       label: string;
+      title: string;
       at: string;
       detail: string | null;
       source: string | null;
@@ -61,6 +62,7 @@ interface ConflictResult {
     right: {
       eventId: string;
       label: string;
+      title: string;
       at: string;
       detail: string | null;
       source: string | null;

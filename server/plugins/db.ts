@@ -177,6 +177,12 @@ CREATE INDEX IF NOT EXISTS ingest_runs_status_idx ON ingest_runs (status, starte
   created_at TEXT NOT NULL DEFAULT (now())
 )`,
     },
+    {
+      version: 9,
+      name: "delivery-idempotency",
+      sql: `ALTER TABLE integration_deliveries ADD COLUMN IF NOT EXISTS delivery_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS integration_deliveries_key_idx ON integration_deliveries (provider, delivery_key)`,
+    },
   ],
   { table: "blameless_migrations" },
 );

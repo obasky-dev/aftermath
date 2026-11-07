@@ -120,6 +120,7 @@ export const integrationDeliveries = pgTable("integration_deliveries", {
   status: text("status").notNull(),
   at: text("at").notNull(),
   incidentId: text("incident_id"),
+  deliveryKey: text("delivery_key"),
   ...ownableColumns(),
   createdAt: text("created_at")
     .notNull()

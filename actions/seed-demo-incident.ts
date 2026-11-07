@@ -1,5 +1,5 @@
 import { defineAction } from "@agent-native/core/action";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
@@ -135,7 +135,7 @@ const seedEvents = [
 
 const seedEvidence = [
   {
-    eventTitle: "Release r-482 build started",
+    eventTitle: "r-482 deploy",
     label: "Build log",
     url: "https://vercel.example.com/checkout-api/deployments/r-482",
     snippet: "r-482 · config diff: DB pool max 40 → 4",
@@ -270,6 +270,36 @@ export default defineAction({
       .where(eq(schema.incidents.title, TITLE))
       .limit(1);
     if (existing) {
+      // Repair installs seeded before evidence links were added, without
+      // touching events a responder has since corrected.
+      const existingEvents = await db
+        .select({ id: schema.incidentEvents.id, title: schema.incidentEvents.title })
+        .from(schema.incidentEvents)
+        .where(eq(schema.incidentEvents.incidentId, existing.id));
+      const idByTitle = new Map(existingEvents.map((row) => [row.title, row.id]));
+      const eventIds = existingEvents.map((row) => row.id);
+      const linked = eventIds.length
+        ? await db
+            .select({
+              eventId: schema.incidentEvidence.eventId,
+              label: schema.incidentEvidence.label,
+            })
+            .from(schema.incidentEvidence)
+            .where(inArray(schema.incidentEvidence.eventId, eventIds))
+        : [];
+      const linkKey = new Set(linked.map((row) => `${row.eventId}:${row.label}`));
+      for (const evidence of seedEvidence) {
+        const eventId = idByTitle.get(evidence.eventTitle);
+        if (!eventId || linkKey.has(`${eventId}:${evidence.label}`)) continue;
+        await db.insert(schema.incidentEvidence).values({
+          id: newId("evd"),
+          eventId,
+          label: evidence.label,
+          url: evidence.url,
+          snippet: evidence.snippet,
+          ...owner,
+        });
+      }
       return {
         incidentId: existing.id,
         created: false,
