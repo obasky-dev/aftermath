@@ -25,7 +25,10 @@ async function call(path, init = {}) {
   });
   const setCookies = response.headers.getSetCookie?.() ?? [];
   if (setCookies.length > 0) {
-    cookie = setCookies.map((value) => value.split(";")[0]).join("; ");
+    cookie = setCookies
+      .map((value) => value.split(";")[0])
+      .filter((pair) => !pair.endsWith("="))
+      .join("; ");
   }
   const text = await response.text();
   let json = null;
