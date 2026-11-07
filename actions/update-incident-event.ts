@@ -27,6 +27,10 @@ export default defineAction({
       .boolean()
       .optional()
       .describe("Mark this event as the root cause"),
+    eventStatus: z
+      .enum(["confirmed", "red_herring", "unverified"])
+      .optional()
+      .describe("Resolution state once conflicting evidence has been reviewed"),
   }),
   http: { method: "PUT" },
   outputSchema: z.object({
@@ -35,6 +39,7 @@ export default defineAction({
     title: z.string(),
     confidence: z.number(),
     isRootCause: z.boolean(),
+    eventStatus: z.string(),
   }),
   run: async (args) => {
     const { incidentEvents } = schema;
@@ -57,6 +62,7 @@ export default defineAction({
     if (args.detail !== undefined) patch.detail = args.detail;
     if (args.confidence !== undefined) patch.confidence = args.confidence;
     if (args.isRootCause !== undefined) patch.isRootCause = args.isRootCause;
+    if (args.eventStatus !== undefined) patch.eventStatus = args.eventStatus;
     if (Object.keys(patch).length === 0) {
       fail("Send at least one field to update.", {
         errorCode: "empty_patch",
@@ -73,6 +79,7 @@ export default defineAction({
         title: incidentEvents.title,
         confidence: incidentEvents.confidence,
         isRootCause: incidentEvents.isRootCause,
+        eventStatus: incidentEvents.eventStatus,
       });
     if (!row) {
       fail("Event not found.", { errorCode: "not_found", statusCode: 404 });

@@ -80,7 +80,7 @@ function fmt(iso: string | null | undefined) {
   return iso ? `${iso.slice(11, 16)} UTC` : "—";
 }
 
-function isChangeEvent(event: { kind: string; title: string }) {
+export function isChangeEvent(event: { kind: string; title: string }) {
   if (event.kind === "deploy") return true;
   if (/rollback|resolved|acknowledged|paged|recovery/i.test(event.title)) return false;
   return /failover|migration|config|dns|certificate|scaled|scaling|quota|feature flag/i.test(
@@ -166,7 +166,7 @@ export async function analyzeIncident(
   );
 
   const hypotheses: Hypothesis[] = events
-    .filter(isChangeEvent)
+    .filter((event) => isChangeEvent(event) && event.eventStatus !== "red_herring")
     .map((event) => {
       const lagMinutes = minutesBetween(onset, event.time);
       const contradictedBy =

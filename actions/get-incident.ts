@@ -39,6 +39,14 @@ export default defineAction({
         eventStatus: z.string(),
         editedBy: z.string(),
         originalAt: z.string().nullable(),
+        evidence: z.array(
+          z.object({
+            id: z.string(),
+            label: z.string(),
+            url: z.string().nullable(),
+            snippet: z.string().nullable(),
+          }),
+        ),
       }),
     ),
     actionItems: z.array(
@@ -59,7 +67,8 @@ export default defineAction({
     label: "Open incident",
   }),
   run: async ({ id }) => {
-    const { incidents, incidentEvents, incidentActionItems } = schema;
+    const { incidents, incidentEvents, incidentActionItems, incidentEvidence: evidence } =
+      schema;
     const [incident] = await getDb()
       .select()
       .from(incidents)
@@ -87,6 +96,25 @@ export default defineAction({
       .where(eq(incidentEvents.incidentId, id))
       .orderBy(asc(incidentEvents.at));
 
+    const evidenceRows = await getDb()
+      .select({
+        id: evidence.id,
+        eventId: evidence.eventId,
+        label: evidence.label,
+        url: evidence.url,
+        snippet: evidence.snippet,
+      })
+      .from(evidence)
+      .innerJoin(incidentEvents, eq(evidence.eventId, incidentEvents.id))
+      .where(eq(incidentEvents.incidentId, id));
+
+    const evidenceByEvent = new Map<string, typeof evidenceRows>();
+    for (const row of evidenceRows) {
+      const list = evidenceByEvent.get(row.eventId) ?? [];
+      list.push(row);
+      evidenceByEvent.set(row.eventId, list);
+    }
+
     const actionItems = await getDb()
       .select({
         id: incidentActionItems.id,
@@ -111,7 +139,15 @@ export default defineAction({
         summary: incident.summary,
         customerStatus: incident.customerStatus,
       },
-      events,
+      events: events.map((event) => ({
+        ...event,
+        evidence: (evidenceByEvent.get(event.id) ?? []).map((row) => ({
+          id: row.id,
+          label: row.label,
+          url: row.url,
+          snippet: row.snippet,
+        })),
+      })),
       actionItems,
     };
   },

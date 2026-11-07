@@ -21,6 +21,11 @@ import {
 } from "react-router";
 import type { LinksFunction } from "react-router";
 
+import "@/components/chat/aftermath-cards";
+import {
+  KeyboardShortcutsDialog,
+  useShortcutSheetShortcut,
+} from "@/components/layout/KeyboardShortcuts";
 import { Layout as AppLayout } from "@/components/layout/Layout";
 import { AppToolkitProvider } from "@/components/ui/toolkit-provider";
 import { useNavigationState } from "@/hooks/use-navigation-state";
@@ -117,11 +122,15 @@ function ThemeToggleItem() {
 
 function AppContent() {
   const [cmdkOpen, setCmdkOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const navigate = useNavigate();
   const t = useT();
   const location = useLocation();
   const isChatThread = threadIdFromPath(location.pathname) !== null;
   useCommandMenuShortcut(useCallback(() => setCmdkOpen(true), []));
+  useShortcutSheetShortcut(
+    useCallback(() => setShortcutsOpen(true), []),
+  );
   return (
     <>
       <CommandMenu
@@ -163,10 +172,37 @@ function AppContent() {
             {t("settings.openAgentSettings")}
           </CommandMenu.Item>
         </CommandMenu.Group>
+        <CommandMenu.Group heading="Aftermath">
+          <CommandMenu.Item
+            onSelect={() => navigate("/incidents")}
+            keywords={["incident", "incidents", "list", "aftermath"]}
+          >
+            All incidents
+          </CommandMenu.Item>
+          <CommandMenu.Item
+            onSelect={() => navigate("/incidents/new")}
+            keywords={["incident", "new", "import", "pack"]}
+          >
+            Import an incident pack
+          </CommandMenu.Item>
+          <CommandMenu.Item
+            onSelect={() => navigate("/connections")}
+            keywords={["connections", "providers", "integrations", "sentry", "slack"]}
+          >
+            Connections
+          </CommandMenu.Item>
+          <CommandMenu.Item
+            onSelect={() => setShortcutsOpen(true)}
+            keywords={["keyboard", "shortcuts", "help", "keys"]}
+          >
+            Keyboard shortcuts
+          </CommandMenu.Item>
+        </CommandMenu.Group>
         <CommandMenu.Group heading={t("root.commandAppearance")}>
           <ThemeToggleItem />
         </CommandMenu.Group>
       </CommandMenu>
+      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
       <AppLayout>
         <Outlet />
       </AppLayout>

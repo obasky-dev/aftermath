@@ -86,6 +86,37 @@ try {
   root = events.find((event) => event.isRootCause) ?? null;
   check("seed has an 11-event timeline", events.length === 11, `${events.length} events`);
   check("seed has a suspected cause", Boolean(root), root?.title ?? "none");
+  check(
+    "events carry evidence links",
+    Array.isArray(root?.evidence) && root.evidence.length > 0,
+    `${root?.evidence?.length ?? 0} evidence items`,
+  );
+
+  const conflictsBeforeResponse = await call(
+    `/_agent-native/actions/list-conflicts?id=${encodeURIComponent(seed.id)}`,
+  );
+  const conflictsBefore = conflictsBeforeResponse.json?.conflicts ?? [];
+  check(
+    "conflict cards name both sides with resolutions",
+    conflictsBefore.length >= 2 &&
+      conflictsBefore.every(
+        (conflict) =>
+          Boolean(conflict.left?.eventId) &&
+          Boolean(conflict.right?.eventId) &&
+          (conflict.options?.length ?? 0) >= 2,
+      ),
+    `${conflictsBefore.length} open conflicts`,
+  );
+  check(
+    "the timing conflict compares the deploy with the channel claim",
+    conflictsBefore.some(
+      (conflict) =>
+        conflict.kind === "timing" &&
+        conflict.left.eventId === root.id &&
+        /promot/i.test(conflict.right.label),
+    ),
+    conflictsBefore.map((conflict) => conflict.kind).join(", "),
+  );
 
   const originalAnalysis = await call(
     `/_agent-native/actions/analyze-incident?id=${encodeURIComponent(seed.id)}&mode=original`,
@@ -136,6 +167,16 @@ try {
         hypothesis.status === "contradicted",
     ),
     "hypothesis status",
+  );
+
+  const conflictsAfterResponse = await call(
+    `/_agent-native/actions/list-conflicts?id=${encodeURIComponent(seed.id)}`,
+  );
+  const conflictsAfter = conflictsAfterResponse.json?.conflicts ?? [];
+  check(
+    "the timing conflict closes after the correction",
+    !conflictsAfter.some((conflict) => conflict.kind === "timing"),
+    conflictsAfter.map((conflict) => conflict.kind).join(", ") || "none",
   );
 
   const originalAgain = await call(
@@ -255,6 +296,32 @@ try {
     "readiness passes after the correction",
     readiness.json?.ready === true && (readiness.json?.checks?.length ?? 0) === 7,
     `${readiness.json?.ready} / ${readiness.json?.checks?.length ?? 0} checks`,
+  );
+
+  const causalConflict = conflictsAfter.find((conflict) => conflict.kind === "causal");
+  const resolution = causalConflict?.options?.find(
+    (option) => option.id === causalConflict.recommendedOptionId,
+  );
+  let resolvedConflict = false;
+  if (resolution?.patch) {
+    const resolved = await call("/_agent-native/actions/update-incident-event", {
+      method: "PUT",
+      body: JSON.stringify(resolution.patch),
+    });
+    const afterResolution = await call(
+      `/_agent-native/actions/list-conflicts?id=${encodeURIComponent(seed.id)}`,
+    );
+    resolvedConflict =
+      resolved.status === 200 &&
+      resolved.json?.eventStatus === "red_herring" &&
+      !(afterResolution.json?.conflicts ?? []).some(
+        (conflict) => conflict.id === causalConflict.id,
+      );
+  }
+  check(
+    "one-click resolution persists and clears the conflict",
+    resolvedConflict,
+    resolution?.label ?? "no causal conflict",
   );
 
   const summaries = await call(

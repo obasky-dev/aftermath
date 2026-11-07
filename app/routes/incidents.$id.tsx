@@ -3,6 +3,8 @@ import { setClientAppState } from "@agent-native/core/client/application-state";
 import { useActionMutation, useActionQuery } from "@agent-native/core/client/hooks";
 import {
   IconAlertTriangle,
+  IconArrowBackUp,
+  IconArrowForwardUp,
   IconArrowLeft,
   IconArrowRight,
   IconBrandSlack,
@@ -14,7 +16,7 @@ import {
   IconPrinter,
   IconSparkles,
 } from "@tabler/icons-react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import {
@@ -169,6 +171,10 @@ function IncidentDetail({ id }: { id: string }) {
   const [shareCopied, setShareCopied] = useState(false);
   const [slackCopied, setSlackCopied] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
+  const [history, setHistory] = useState<Array<{ id: string; from: string; to: string }>>(
+    [],
+  );
+  const [historyIndex, setHistoryIndex] = useState(0);
 
   const events = useMemo<EventRow[]>(() => {
     const rows = incidentQuery.data?.events ?? [];
@@ -203,7 +209,7 @@ function IncidentDetail({ id }: { id: string }) {
     void postmortemQuery.refetch();
   }
 
-  function applyMove(eventId: string, at: string) {
+  function sendMove(eventId: string, at: string) {
     setChallengeOn(false);
     setOverrides((state) => ({ ...state, [eventId]: at }));
     setCopied(false);
@@ -220,6 +226,46 @@ function IncidentDetail({ id }: { id: string }) {
       },
     );
   }
+
+  function applyMove(eventId: string, at: string) {
+    const current = events.find((event) => event.id === eventId);
+    if (current && current.at !== at) {
+      const next = [...history.slice(0, historyIndex), { id: eventId, from: current.at, to: at }];
+      setHistory(next);
+      setHistoryIndex(next.length);
+    }
+    sendMove(eventId, at);
+  }
+
+  function undoMove() {
+    if (historyIndex === 0) return;
+    const entry = history[historyIndex - 1];
+    if (!entry) return;
+    setHistoryIndex(historyIndex - 1);
+    sendMove(entry.id, entry.from);
+  }
+
+  function redoMove() {
+    if (historyIndex >= history.length) return;
+    const entry = history[historyIndex];
+    if (!entry) return;
+    setHistoryIndex(historyIndex + 1);
+    sendMove(entry.id, entry.to);
+  }
+
+  useEffect(() => {
+    function onKeyDown(keyboardEvent: KeyboardEvent) {
+      const target = keyboardEvent.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      if (!(keyboardEvent.metaKey || keyboardEvent.ctrlKey)) return;
+      if (keyboardEvent.key.toLowerCase() !== "z") return;
+      keyboardEvent.preventDefault();
+      if (keyboardEvent.shiftKey) redoMove();
+      else undoMove();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   function tryCorrection() {
     const suspectId =
@@ -498,6 +544,14 @@ function IncidentDetail({ id }: { id: string }) {
           />
         ) : null}
 
+        <ConflictQuestions
+          id={id}
+          onResolved={() => {
+            refreshDerived();
+            void incidentQuery.refetch();
+          }}
+        />
+
         <div className="mt-8 border-l-2 border-primary/60 pl-4 print:hidden">
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             What we know now
@@ -520,7 +574,7 @@ function IncidentDetail({ id }: { id: string }) {
               The timeline
             </h2>
             <p className="text-xs text-muted-foreground">
-              Drag any event to correct its time · UTC
+              Drag to correct · ←/→ 1 min · Shift + ←/→ 5 min · ⌘/Ctrl + Z undo · UTC
             </p>
           </div>
           <IncidentTimeline
@@ -536,7 +590,30 @@ function IncidentDetail({ id }: { id: string }) {
                 ? `${selected.title} · ${fmt(selected.at)} · ${selected.confidence}% confidence`
                 : `${events.length} events`}
             </span>
-            <span className="flex items-center gap-2">
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Undo the last timeline correction"
+                  onClick={undoMove}
+                  disabled={historyIndex === 0 || moveEvent.isPending}
+                  className="grid size-6 place-items-center rounded-sm border border-border transition-colors hover:text-foreground disabled:opacity-40"
+                >
+                  <IconArrowBackUp className="size-3.5" strokeWidth={2} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Redo the timeline correction"
+                  onClick={redoMove}
+                  disabled={historyIndex >= history.length || moveEvent.isPending}
+                  className="grid size-6 place-items-center rounded-sm border border-border transition-colors hover:text-foreground disabled:opacity-40"
+                >
+                  <IconArrowForwardUp className="size-3.5" strokeWidth={2} />
+                </button>
+                <span className="font-mono text-[10px] tabular-nums text-muted-foreground/80">
+                  {history.length > 0 ? `${historyIndex}/${history.length}` : "no edits"}
+                </span>
+              </span>
               {selected && !selected.isRootCause ? (
                 <Button
                   variant="ghost"
@@ -859,6 +936,60 @@ function StoryColumn({
   );
 }
 
+function prefersReducedMotion() {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+function AnimatedMinutes({ value }: { value: number | null | undefined }) {
+  const resolved = value ?? null;
+  const [display, setDisplay] = useState<number | null>(resolved);
+  const previousRef = useRef<number | null>(resolved);
+  const [was, setWas] = useState<number | null>(null);
+
+  useEffect(() => {
+    const previous = previousRef.current;
+    if (previous === resolved) return;
+    previousRef.current = resolved;
+    if (previous === null || resolved === null || prefersReducedMotion()) {
+      setDisplay(resolved);
+      setWas(null);
+      return;
+    }
+    setWas(previous);
+    const started = performance.now();
+    let frame = 0;
+    function tick(now: number) {
+      const progress = Math.min(1, (now - started) / 240);
+      setDisplay(Math.round(previous! + (resolved! - previous!) * progress));
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    }
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [resolved]);
+
+  return (
+    <span className="inline-flex items-baseline gap-1.5">
+      <span>
+        {display ?? "—"}
+        {display !== null ? (
+          <span className="ml-1 text-xs text-muted-foreground">min</span>
+        ) : null}
+      </span>
+      {was !== null && was !== display ? (
+        <span
+          className="rounded-sm bg-primary/10 px-1 font-mono text-[9px] tabular-nums text-primary"
+          title={`Previously ${was} min`}
+        >
+          was {was}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function MetricsStrip({ analysis }: { analysis: AnalysisView }) {
   const items = [
     { label: "Detect", value: analysis.metrics?.timeToDetect },
@@ -876,10 +1007,7 @@ function MetricsStrip({ analysis }: { analysis: AnalysisView }) {
             {item.label}
           </p>
           <p className="mt-1 font-mono text-2xl tabular-nums">
-            {item.value ?? "—"}
-            {item.value != null ? (
-              <span className="ml-1 text-xs text-muted-foreground">min</span>
-            ) : null}
+            <AnimatedMinutes value={item.value} />
           </p>
         </div>
       ))}
@@ -1492,6 +1620,195 @@ function ChallengePanel({
         <IconSparkles className="size-4" strokeWidth={1.8} />
         Ask the agent to answer
       </Button>
+    </section>
+  );
+}
+
+interface ConflictRefView {
+  eventId: string;
+  label: string;
+  at: string;
+  detail: string | null;
+  source: string | null;
+  confidence: number;
+}
+
+interface ConflictOptionView {
+  id: string;
+  label: string;
+  description: string;
+  patch: Record<string, unknown> | null;
+}
+
+interface ConflictCardView {
+  id: string;
+  kind: "timing" | "causal";
+  title: string;
+  question: string;
+  left: ConflictRefView;
+  right: ConflictRefView;
+  options: ConflictOptionView[];
+  recommendedOptionId: string;
+}
+
+function ConflictQuestions({
+  id,
+  onResolved,
+}: {
+  id: string;
+  onResolved: () => void;
+}) {
+  const query = useActionQuery("list-conflicts", { id });
+  const update = useActionMutation("update-incident-event");
+  const [busy, setBusy] = useState<string | null>(null);
+  const conflicts = (query.data?.conflicts ?? []) as ConflictCardView[];
+
+  function resolve(card: ConflictCardView, option: ConflictOptionView) {
+    if (!option.patch) {
+      askAgent(card);
+      return;
+    }
+    setBusy(`${card.id}:${option.id}`);
+    update.mutate(option.patch as { id: string } & Record<string, unknown>, {
+      onSuccess: () => {
+        setBusy(null);
+        void query.refetch();
+        onResolved();
+      },
+      onError: () => setBusy(null),
+    });
+  }
+
+  function askAgent(card: ConflictCardView) {
+    try {
+      sendToAgentChat({
+        message: `Resolve one evidence conflict on incident ${id}. Left: "${card.left.label}" at ${fmt(card.left.at)} (${card.left.confidence}% confidence, ${card.left.source ?? "no source"}). Right: "${card.right.label}" at ${fmt(card.right.at)} (${card.right.confidence}% confidence, ${card.right.source ?? "no source"}). Question: ${card.question} Call list-conflicts for ${id} and analyze-incident. Answer with the single most defensible resolution, cite both events, and say what would change your mind. Do not invent evidence.`,
+        submit: true,
+        openSidebar: true,
+      });
+    } catch {
+      // The card still offers the deterministic resolutions.
+    }
+  }
+
+  if (query.isLoading) {
+    return (
+      <div className="mt-4 rounded-md border border-border bg-card p-5">
+        <div className="h-3 w-32 animate-pulse rounded bg-muted" />
+        <div className="mt-3 h-16 animate-pulse rounded bg-muted/60" />
+      </div>
+    );
+  }
+
+  if (conflicts.length === 0) {
+    return (
+      <section
+        className="mt-4 rounded-md border border-dashed border-border bg-card px-5 py-4 print:hidden"
+        aria-label="Evidence conflicts"
+      >
+        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Evidence conflicts
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          No unresolved conflicts. Every claim in the timeline agrees with its sources.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mt-4 print:hidden" aria-label="Evidence conflicts" aria-live="polite">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+          Evidence conflicts
+        </h2>
+        <span className="rounded-full border border-amber-700/30 bg-amber-700/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-amber-800 dark:text-amber-400">
+          {conflicts.length} open
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-3">
+        {conflicts.map((card) => {
+          const recommended = card.options.find(
+            (option) => option.id === card.recommendedOptionId,
+          );
+          const others = card.options.filter(
+            (option) => option.id !== card.recommendedOptionId,
+          );
+          return (
+            <article
+              key={card.id}
+              className="rounded-md border border-border bg-card p-5"
+            >
+              <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-amber-700 dark:text-amber-400">
+                {card.kind === "timing" ? "Timing conflict" : "Causal conflict"}
+              </p>
+              <h3 className="mt-1.5 text-sm font-semibold leading-snug">{card.title}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                {card.question}
+              </p>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {[card.left, card.right].map((side, index) => (
+                  <div
+                    key={side.eventId}
+                    className="rounded-sm border border-border bg-background/60 p-3"
+                  >
+                    <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground">
+                      {index === 0 ? "Record" : "Conflicting evidence"}
+                    </p>
+                    <p className="mt-1 font-mono text-xs tabular-nums">
+                      {fmt(side.at)}
+                      <span className="ml-2 text-muted-foreground">
+                        {side.confidence}% conf
+                      </span>
+                    </p>
+                    <p className="mt-1 text-xs font-medium leading-snug">{side.label}</p>
+                    {side.detail ? (
+                      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                        {side.detail}
+                      </p>
+                    ) : null}
+                    {side.source ? (
+                      <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.1em] text-muted-foreground/80">
+                        {side.source}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {recommended ? (
+                  <Button
+                    size="sm"
+                    onClick={() => resolve(card, recommended)}
+                    disabled={busy !== null}
+                  >
+                    {busy === `${card.id}:${recommended.id}`
+                      ? "Resolving…"
+                      : recommended.label}
+                  </Button>
+                ) : null}
+                {others.map((option) => (
+                  <Button
+                    key={option.id}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => resolve(card, option)}
+                    disabled={busy !== null}
+                  >
+                    {busy === `${card.id}:${option.id}` ? "Working…" : option.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+                {recommended?.description}
+              </p>
+            </article>
+          );
+        })}
+      </div>
     </section>
   );
 }

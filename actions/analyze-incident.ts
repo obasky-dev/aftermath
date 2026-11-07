@@ -18,6 +18,7 @@ export default defineAction({
   }),
   http: { method: "GET" },
   readOnly: true,
+  chatUI: { renderer: "aftermath.analysis-card", title: "Analysis" },
   outputSchema: analysisOutput,
   link: ({ args }) => ({
     url: buildDeepLink({

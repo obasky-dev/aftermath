@@ -13,6 +13,7 @@ export default defineAction({
   }),
   http: { method: "GET" },
   readOnly: true,
+  chatUI: { renderer: "aftermath.rollback-card", title: "What-if rollback" },
   outputSchema: z.object({
     at: z.string(),
     exposureStart: z.string(),
