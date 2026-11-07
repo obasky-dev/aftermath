@@ -156,7 +156,7 @@ No live provider credentials are connected in this build. The provider calls are
 | `pnpm typecheck` | clean |
 | `pnpm agent-native:doctor` | clean, 14 guards |
 | `pnpm test` | 4 parser tests pass |
-| `pnpm verify:timeline` | end-to-end checks against the running app over HTTP |
+| `pnpm verify:timeline` | **55/55** checks against the running app over HTTP (CI runtime job) |
 | Original timeline | deploy 25 min early; the failover leads at 5; exposure 43 min |
 | Deploy moved to 14:02 | deploy leads at 3; exposure 21 min |
 | Database failover | contradicted by flat DB connection errors |
@@ -167,7 +167,14 @@ No live provider credentials are connected in this build. The provider calls are
 | Public share | `/share/<token>` loads **without a session** (200, full document) |
 | Filters | search + severity + status → 1; a nonsense search → 0 |
 | Pack import | 3-line pack → 3 events with sources, then cleaned up |
-| Alert webhook | 401 for a wrong token; 202 creates a sev1 incident with its source |
+| Alert webhook | 401 for a wrong token or stale signature; 202 creates a sev1 incident with its source |
+| Alert idempotency | Same `x-aftermath-delivery` replays return 200 `duplicate: true` with the original incident |
+| HMAC intake | A valid `sha256=` signature over `timestamp.rawBody` is accepted; the rejected attempt is recorded |
+| Conflict cards | The timing conflict names both sides, closes after the correction, and the causal conflict appears with a patch |
+| One-click resolution | `eventStatus: red_herring` persists and the conflict disappears from `list-conflicts` |
+| Slack command | Signed `status` returns the verdict; unsigned returns 401; signed `move` changes the same event row to 14:04 |
+| Pages render | `/incidents`, `/connections` and `/incidents/:id` return 200 with their SSR title and no error page |
+| Evidence links | The suspected cause carries its build-log evidence over HTTP |
 | Incident list and detail | HTTP 200 |
 
 ## Project docs
@@ -204,10 +211,10 @@ Then prove it:
 
 ```bash
 pnpm test             # parser unit tests
-pnpm verify:timeline  # 15 end-to-end checks against the running app
+pnpm verify:timeline  # 55 end-to-end checks against the running app
 ```
 
-CI runs typecheck, the framework guards and the unit tests on every push (`.github/workflows/ci.yml`).
+CI runs typecheck, the framework guards and six unit tests on every push, then boots the dev server and runs all 55 HTTP checks (`.github/workflows/ci.yml`).
 
 > PGlite locks its data directory to one process. Stop `pnpm dev` before running a CLI action, then start it again.
 

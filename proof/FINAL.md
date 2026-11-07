@@ -1,48 +1,60 @@
 # FINAL PROOF
 
-Date: 2026-11-06. Repo: `obasky-dev/aftermath`.
+Date: 2026-11-07. Repo: `obasky-dev/aftermath`. Branch: `master`.
 
 ## Verified
 
+Every line below is from the GitHub Actions run for commit `125a8fc`, not a hand-run claim.
+
 | Item | Evidence |
 | --- | --- |
-| Typecheck | CI `verify` job, clean |
-| Framework guards | CI `verify` job, 14 guards, clean |
-| Unit tests | 4 parser tests pass |
-| Contract timeline | HTTP proof: original `weak`, deploy 25 min early, failover leads at 5, exposure 43 |
-| Correction | HTTP proof: deploy moved to 14:02, `consistent`, lag 3, exposure 21 |
-| Contradiction | HTTP proof: DB failover `contradicted` by flat connection errors |
-| Postmortem | HTTP proof: correction log 13:40 → 14:02, metrics and candidate causes |
-| Challenge | HTTP proof: 3 evidence-based objections and the settling question |
-| Approval gate | HTTP: 403 outside the signed-in UI |
-| Comments / share / filters | HTTP: added and listed, public page 200 without a session, filters 1 vs 0 |
-| Alert webhook | HTTP: wrong token 401, valid alert 202 and a sev1 incident with its source |
+| Typecheck | `verify` job, clean |
+| Framework guards | `verify` job, 14 guards, clean |
+| Unit tests | 6 parser tests pass (including WebVTT and SRT) |
+| HTTP proof | `runtime` job prints **55/55 checks passed** |
+| Contract timeline | original `weak`, deploy 25 min early, failover leads at 5, exposure 43 |
+| Correction | deploy moved to 14:02, `consistent`, lag 3, exposure 21 |
+| Contradiction | DB failover `contradicted` by flat connection errors |
+| Evidence links | the suspected cause returns its build-log evidence |
+| Conflict cards | a timing conflict names both sides before the correction; it closes after, and a causal conflict appears with a one-click patch |
+| One-click resolution | `eventStatus: red_herring` persists and removes the conflict |
+| Postmortem | correction log 13:40 → 14:02, metrics and candidate causes |
+| Challenge | 3 evidence-based objections and the settling question |
+| Approval gate | 403 outside the signed-in UI |
+| Approval artifacts | 7 fixture-labelled artifacts, listed back |
+| Comments / share / filters | added and listed, public page 200 without a session, filters 1 vs 0 |
+| Recurrence memory | the pool-exhaustion match is returned with its method label |
+| Detection gap | 1 minute, with a concrete alert rule |
+| What-if rollback | exposure recomputed 21 → 8 |
+| Durable ingest | three stages, complete, 100% |
+| Alert webhook | wrong token 401; valid alert 202 with its source; replay by delivery id returns duplicate |
+| HMAC intake | valid signature accepted; stale signature 401 |
+| Slack command | signed `status` returns `CONSISTENT`; unsigned 401; signed `move` lands on the same event row |
+| Pages | `/incidents`, `/connections`, `/incidents/:id` return 200 with their SSR title and no error page |
 
-The last full HTTP run printed **26/27**; the single failure was the old incident title in the share assertion. It was fixed and the public page was confirmed separately (200, title and Discussion present).
+## Implemented, not browser-automated
 
-## Implemented but not runtime-verified
+These are typechecked and their actions are proven over HTTP, but no headless-browser test in CI exercises the pixels or the pointer/keyboard path:
 
-The machine had **7.3 GB RAM, 1.1 GB free** at the end. The dev server hit a JavaScript heap OOM right after `create-postmortem-artifacts` returned 200, and the shell began failing `fork`.
+- Timeline drag, ghost marker, zoom/pan, ±1/±5-minute keys, undo/redo and evidence popovers.
+- Number-morph animation and the `was N` diff chip.
+- Command palette entries and the `?` shortcut sheet.
+- The four chat cards registered for `analyze-incident`, `simulate-rollback`, `list-conflicts` and `challenge-incident`.
+- The agent-team protocol in `.agents/skills/incident-team/SKILL.md`; no model call is made in CI.
 
-- Review & ship readiness, summaries and artifacts: implemented and typechecked; the artifact action returned 200 before the OOM; the full proof did not print.
-- Durable ingest stepper and what-if tuner: implemented and typechecked by CI; not exercised in a running app.
-- Connections surface and fixture deliveries: typechecked and CI-green; not exercised in a running app.
-- Browser pass over the new Review & ship, Connections, Durable ingest and What-if UI: not run.
+## Not built or not verified live
 
-## Not built
-
-- Live provider adapters with signatures, idempotency and retries.
-- Agent teams and generative UI.
-- Undo/redo, zoom/pan, command palette, ±5 minute shortcuts, number-morph animations.
-- Recurrence memory, detection gap, conflict-resolution cards.
-- `DEMO.md` beats beyond the current UI are written; the Clips recording does not exist.
-- Deployment.
+- **Live provider adapters**: GitHub, Vercel, Linear, PagerDuty, Sentry, Supabase and Cloudflare remain fixture-backed and labelled. No credential exists in this workspace. Marked **UNVERIFIED-LIVE**, as the contract requires.
+- **Real Slack workspace round-trip**: the signature scheme is verified with a locally generated signature; no Slack app is installed.
+- **Deployment**: no hosted Postgres (`DATABASE_URL`), so the production server (which refuses PGlite) is not deployed. Vercel CLI is authenticated but the project is not linked.
+- **Embeddings**: recurrence memory uses a keyword-Jaccard fallback and says so in the UI.
+- **Browser visual/a11y pass**: not run in this environment; CI covers SSR and HTTP only.
+- **Clips recording**: the owner's task.
 
 ## Environment
 
-- 7.3 GB RAM; 1.1 GB free.
-- Disk 3.3 GB free of 238 GB.
-- PGlite locks `./data/pglite` to one process; stale locks must be removed after a crash.
-- Dev-server cold start on this machine can take minutes; do not restart during a recording.
+- 7.3 GB RAM; the dev server previously hit a JavaScript heap OOM locally, so CI is the runtime proof.
+- Disk was tight during the build; free space was below 3 GB at points. No build output is committed.
+- PGlite locks `./data/pglite` to one process; stop `pnpm dev` before CLI actions.
 
-Run `pnpm dev` after freeing memory. The app is not running now.
+The app is not running locally. To re-derive the proof, push to `master` or run `pnpm dev` followed by `pnpm verify:timeline`.

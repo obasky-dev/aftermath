@@ -17,10 +17,11 @@
 | `incident_action_items` | owner team, status |
 | `incident_comments` | discussion, included in the postmortem |
 | `postmortem_artifacts` | Linear/GitHub/Slack/Statuspage/Notion drafts, `mode` live or fixture |
-| `integration_state` / `integration_deliveries` | provider connection state and delivery log |
+| `integration_state` / `integration_deliveries` | provider connection state and delivery log, including idempotency keys |
 | `ingest_runs` | durable ingest stage, progress, bundle, error |
+| `past_incidents` | seeded recurrence memory: title, summary, root-cause tag |
 
-Migrations are additive and live in `server/plugins/db.ts` (versions 1–7).
+Migrations are additive and live in `server/plugins/db.ts` (versions 1–9).
 
 ## Deterministic engine
 
@@ -43,7 +44,7 @@ The LLM never computes a number. It reads the computed result and narrates it; t
 ## Actions
 
 - Incidents: `list-incidents`, `get-incident`, `create-incident`, `update-incident-event`, `delete-incident-event`, `mark-incident-cause`, `create-incident-from-alert`, `create-incident-from-pack`, `add-incident-event`, `delete-incident`, `seed-demo-incident`.
-- Analysis: `analyze-incident` (current / original), `challenge-incident`, `simulate-rollback`, `get-readiness`, `lint-blame`, `get-summaries`.
+- Analysis: `analyze-incident` (current / original), `challenge-incident`, `list-conflicts`, `simulate-rollback`, `find-similar-incidents`, `detection-gap`, `get-readiness`, `lint-blame`, `get-summaries`.
 - Postmortem: `generate-postmortem`, `approve-postmortem`, `create-postmortem-share`, `create-postmortem-artifacts`, `get-postmortem-artifacts`.
 - Discussion: `list-incident-comments`, `add-incident-comment`, `delete-incident-comment`.
 - Connections: `list-integrations`, `connect-integration`, `disconnect-integration`, `test-integration`, `send-integration-fixture`, `list-integration-deliveries`.
@@ -55,10 +56,23 @@ The LLM never computes a number. It reads the computed result and narrates it; t
 
 This is a product-level durable run, not the framework's agent-run store. It survives a process restart; it does not survive a database reset.
 
+## Timeline interaction
+
+`app/components/incidents/IncidentTimeline.tsx` is a pointer- and keyboard-driven canvas. It maps a zoom window (1×–8×) to percentages, supports wheel zoom and pan, drags with a live minute tooltip and an original-time ghost, and exposes ↑/↓ moves of 1 and 5 minutes. The page keeps a client-side history so undo/redo can call the same `sendMove` path. Every mutation goes through `updateIncidentEvent` in `server/lib/incidents.ts`, which writes `original_at` once.
+
+Evidence popovers read the evidence rows attached to each event; `get-incident` returns them, so the popover and the agent see the same links.
+
+## Conflicts and generative UI
+
+`list-conflicts` is deterministic: an uncertain change (confidence < 60) compared with the nearest later promotion claim, plus every contradicted hypothesis compared with the evidence that contradicts it. Each conflict carries the two events, a question, and options whose `patch` is an exact `update-incident-event` body. Marking an event `red_herring` removes it from candidate causes in `analysis.ts`, which is why resolving a conflict changes the verdict.
+
+Four actions declare `chatUI` renderers (`aftermath.analysis-card`, `aftermath.rollback-card`, `aftermath.conflict-card`, `aftermath.challenge-card`). `app/components/chat/aftermath-cards.tsx` registers them once; the agent chat renders the same result the page uses.
+
 ## Sharing and public routes
 
 - `/share/<token>` renders the postmortem as read-only HTML without a session (`server/routes/share/[token].get.ts`, enabled by `registerAuthPublicPaths`).
-- `/api/ingest-alert` is the only other public route; a per-install token in settings authenticates it. The token is compared in constant time.
+- `/api/ingest-alert` authenticates with a per-install token or an HMAC-SHA256 signature over `timestamp.rawBody`, rejects timestamps older than five minutes, and dedupes on `x-aftermath-delivery`.
+- `/api/slack/aftermath` verifies Slack's `v0` signature scheme and runs `updateIncidentEvent` for `status` and `move` commands. Ambiguous event queries are refused rather than guessed.
 
 ## Connections
 
@@ -66,11 +80,13 @@ This is a product-level durable run, not the framework's agent-run store. It sur
 
 ## Approval
 
-`get-readiness` checks impact, marked cause, owner teams, a detection item, a prevention item, blame-free language, and unresolved competing theories. Approval is UI-only. It sets `postmortem_approved_at` and creates five fixture artifacts from the computed facts; nothing is sent to a provider.
+`get-readiness` checks impact, marked cause, owner teams, a detection item, a prevention item, blame-free language, and unresolved competing theories. Approval is UI-only. It sets `postmortem_approved_at` and creates seven fixture artifacts from the computed facts (three Linear issues, GitHub draft PR, Slack post, Statuspage draft, Notion export); nothing is sent to a provider.
 
 ## Known limits
 
-- No live provider credentials are connected. Every connection/artifact is labelled fixture.
-- Agent teams and generative UI are not wired; the chat agent narrates and challenges, but does not spawn specialist sub-agents or render inline controls.
-- No undo/redo, zoom/pan, or command palette yet.
+- No live provider credentials are connected. Every connection/artifact is labelled fixture (**UNVERIFIED-LIVE**).
+- Outbound retry/backoff is not implemented for fixture deliveries.
+- Recurrence memory is keyword Jaccard, not embeddings; the UI says so.
+- Agent teams are wired by instruction (`.agents/skills/incident-team/SKILL.md`), not exercised by an automated model run.
+- Browser-level interaction tests are not in CI; SSR and all HTTP actions are.
 - Incidents are workspace-visible by design; there is no per-incident ACL.
