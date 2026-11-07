@@ -279,10 +279,6 @@ export default defineAction({
     }
 
     const incidentId = newId("inc");
-    const owner = {
-      ownerEmail: ctx?.userEmail ?? "",
-      orgId: ctx?.orgId ?? null,
-    };
 
     await db.insert(schema.incidents).values({
       id: incidentId,
