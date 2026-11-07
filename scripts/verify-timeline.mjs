@@ -94,6 +94,22 @@ try {
     `${root?.evidence?.length ?? 0} evidence items`,
   );
 
+  for (const [label, path, marker] of [
+    ["incident list page renders", "/incidents", "Move one event"],
+    ["connections page renders", "/connections", "Evidence"],
+    ["incident detail page renders", `/incidents/${encodeURIComponent(seed.id)}`, ""],
+  ]) {
+    const pageResponse = await fetch(`${BASE}${path}`, { headers: { cookie } });
+    const html = await pageResponse.text();
+    check(
+      label,
+      pageResponse.status === 200 &&
+        !html.includes("An error has occurred") &&
+        (!marker || html.includes(marker)),
+      `status ${pageResponse.status}`,
+    );
+  }
+
   const conflictsBeforeResponse = await call(
     `/_agent-native/actions/list-conflicts?id=${encodeURIComponent(seed.id)}`,
   );
