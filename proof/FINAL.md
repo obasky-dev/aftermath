@@ -4,7 +4,7 @@ Date: 2026-11-07. Repo: `obasky-dev/aftermath`. Branch: `master`.
 
 ## Verified
 
-Every line below is from the GitHub Actions run for commit `125a8fc`, not a hand-run claim.
+Every line below is from the GitHub Actions run for commit `3a190ea`, not a hand-run claim.
 
 | Item | Evidence |
 | --- | --- |
