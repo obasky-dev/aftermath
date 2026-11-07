@@ -18,8 +18,9 @@ Set in the Vercel production environment:
 - `BETTER_AUTH_SECRET`, `SECRETS_ENCRYPTION_KEY`, `CRON_SECRET` — random 32-byte secrets.
 - `AGENT_NATIVE_RELEASE_MIGRATIONS=1`, `AGENT_NATIVE_HOSTED_HARNESS=true`.
 - `AGENT_NATIVE_VERCEL_CRON_SCHEDULE=0 9 * * *` — Hobby plans reject the framework's per-minute sweep.
+- `AFTERMATH_PUBLIC_DEMO=1` — issues the demo identity to reviewers without sign-in. It is not `AUTH_DISABLED`; the auth stack still runs, and destructive actions are closed while it is on.
 
-`vercel.json` builds the Nitro Vercel output (`NITRO_PRESET=vercel pnpm build`). Sign-in is enabled; the public demo account is `demo@aftermath.app` / `Aftermath-demo-2026`. No model key is deployed, so the deterministic timeline works but the chat agent asks for a provider key until one is connected.
+`vercel.json` builds the Nitro Vercel output (`NITRO_PRESET=vercel pnpm build`). Public demo mode is on, so the URL opens without sign-in. The demo account `demo@aftermath.app` / `Aftermath-demo-2026` still exists for direct API use. No model key is deployed, so the deterministic timeline works but the chat agent asks for a provider key until one is connected.
 
 ## Needed for live integrations
 

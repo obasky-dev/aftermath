@@ -8,12 +8,9 @@ Built for the [Agent-Native Hackathon](https://www.builder.io/hackathon) on Buil
 
 **https://aftermath-live.vercel.app**
 
-Sign in with the public demo account:
+No login is required. The production deployment issues a demo identity through the auth layer (`getAdditionalSession` gated by `AFTERMATH_PUBLIC_DEMO=1`), so reviewers open the URL and land in the app. Destructive actions (`delete-incident`, `delete-incident-event`, `delete-incident-comment`) and webhook token rotation are closed in public-demo mode; everything the demo needs stays open.
 
-- email: `demo@aftermath.app`
-- password: `Aftermath-demo-2026`
-
-The demo data is fictional. The account is public on purpose; use the **Import a pack** screen or re-run `seed-demo-incident` if the timeline has been changed. The read-only postmortem for the seeded incident is also public:
+The demo data is fictional. Use the **Import a pack** screen or re-run `seed-demo-incident` if the timeline has been changed. If the flag is turned off, the same deployment falls back to normal sign-in; the account `demo@aftermath.app` / `Aftermath-demo-2026` exists for that case. The read-only postmortem for the seeded incident is also public:
 
 **https://aftermath-live.vercel.app/share/03UOScRIovmxePovSGf__I3S**
 

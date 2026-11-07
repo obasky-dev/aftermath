@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "../server/db/index.js";
+import { denyInPublicDemo } from "../server/lib/public-demo.js";
 
 export default defineAction({
   description:
@@ -12,6 +13,7 @@ export default defineAction({
   }),
   http: { method: "DELETE" },
   agentTool: false,
+  authorize: denyInPublicDemo,
   outputSchema: z.object({
     id: z.string(),
     deleted: z.boolean(),

@@ -3,6 +3,8 @@ import { randomBytes } from "node:crypto";
 import { defineAction } from "@agent-native/core/action";
 import { getSetting, putSetting } from "@agent-native/core/settings";
 import { z } from "zod";
+import { fail } from "@agent-native/core/action";
+import { isPublicDemo } from "../server/lib/public-demo.js";
 
 const SETTING = "alert-webhook";
 
@@ -26,6 +28,12 @@ export default defineAction({
     ownerEmail: z.string(),
   }),
   run: async ({ rotate }, ctx) => {
+    if (rotate && isPublicDemo()) {
+      fail("Token rotation is disabled on the public demo.", {
+        errorCode: "public_demo",
+        statusCode: 403,
+      });
+    }
     const existing = (await getSetting(SETTING)) as
       | {
           token?: string;

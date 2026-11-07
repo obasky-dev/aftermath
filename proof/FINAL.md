@@ -31,7 +31,7 @@ Every line below is from the GitHub Actions run for commit `3a190ea`, not a hand
 | HMAC intake | valid signature accepted; stale signature 401 |
 | Slack command | signed `status` returns `CONSISTENT`; unsigned 401; signed `move` lands on the same event row |
 | Pages | `/incidents`, `/connections`, `/incidents/:id` return 200 with their SSR title and no error page |
-| Live deployment (2026-11-07) | `https://aftermath-live.vercel.app` — public with sign-in; demo account lists the seeded incident; `analyze-incident` returns `weak / 25 / 43`; `/share/03UO…` returns 200 logged out |
+| Live deployment (2026-11-07) | `https://aftermath-live.vercel.app` — opens without sign-in via the public-demo session; `/auth/session` returns the demo identity with no cookie; the seeded incident lists; `analyze-incident` returns `weak / 25 / 43`; `/share/03UO…` returns 200 logged out |
 
 ## Implemented, not browser-automated
 
