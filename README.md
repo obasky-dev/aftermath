@@ -188,6 +188,8 @@ No live provider credentials are connected in this build. The provider calls are
 | Pages render | `/incidents`, `/connections` and `/incidents/:id` return 200 with their SSR title and no error page |
 | Live deployment | `aftermath-live.vercel.app` serves the app without Vercel SSO, signs in the demo account, lists the seeded incident, and returns `weak / 25 / 43` from `analyze-incident` |
 | Public share on live | `/share/03UOScRIovmxePovSGf__I3S` returns 200 without a session |
+| Live click-through | Headless browser with no cookies: Try the correction → 3 min / 21 min / contradicted; Accept the evidence → no unresolved conflicts; no console errors |
+| Live write guard | `delete-incident` without a session returns 403; timeline edits succeed |
 | Evidence links | The suspected cause carries its build-log evidence over HTTP |
 | Incident list and detail | HTTP 200 |
 

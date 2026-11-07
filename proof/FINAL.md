@@ -32,6 +32,8 @@ Every line below is from the GitHub Actions run for commit `3a190ea`, not a hand
 | Slack command | signed `status` returns `CONSISTENT`; unsigned 401; signed `move` lands on the same event row |
 | Pages | `/incidents`, `/connections`, `/incidents/:id` return 200 with their SSR title and no error page |
 | Live deployment (2026-11-07) | `https://aftermath-live.vercel.app` — opens without sign-in via the public-demo session; `/auth/session` returns the demo identity with no cookie; the seeded incident lists; `analyze-incident` returns `weak / 25 / 43`; `/share/03UO…` returns 200 logged out |
+| Live click-through | Headless Chromium, no cookies: **Try the correction** → `3 min`, `21 min`, failover `contradicted`; **Accept the evidence** → "No unresolved conflicts"; no console errors. Demo restored to 13:40 / weak / 25 / 43. |
+| Live write guard | `delete-incident` without a session returns **403** while timeline edits and conflict resolutions succeed |
 
 ## Implemented, not browser-automated
 
