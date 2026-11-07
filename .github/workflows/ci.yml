@@ -31,3 +31,40 @@ jobs:
 
       - name: Unit tests
         run: pnpm test
+
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable the pinned package manager
+        run: corepack enable
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Start the app
+        run: |
+          (pnpm exec agent-native dev > dev.log 2>&1 &)
+          for i in $(seq 1 60); do
+            if curl -sf --max-time 20 http://localhost:8080/incidents > /dev/null; then
+              echo "app is up"
+              break
+            fi
+            sleep 5
+          done
+          curl -sS --max-time 30 -o /dev/null -w "status %{http_code}\n" http://localhost:8080/incidents
+
+      - name: Runtime proof
+        run: node scripts/verify-timeline.mjs
+
+      - name: Server log
+        if: failure()
+        run: tail -300 dev.log

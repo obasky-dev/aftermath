@@ -323,6 +323,58 @@ try {
     body: JSON.stringify({ provider: "sentry" }),
   });
 
+  const simulated = await call(
+    `/_agent-native/actions/simulate-rollback?id=${encodeURIComponent(seed.id)}&at=2026-11-04T14:10:00.000Z`,
+  );
+  check(
+    "what-if rollback recomputes exposure",
+    simulated.json?.baselineMinutes === 21 &&
+      simulated.json?.rollbackMinutes === 8 &&
+      simulated.json?.savedMinutes === 13,
+    `${simulated.json?.baselineMinutes} -> ${simulated.json?.rollbackMinutes}`,
+  );
+
+  const ingest = await call("/_agent-native/actions/start-ingest", {
+    method: "POST",
+    body: JSON.stringify({
+      incidentId: seed.id,
+      bundle: [
+        "2026-11-04 14:12 [chat] Ingest check one | Slack #incidents",
+        "2026-11-04 14:20 [log] Ingest check two | Vercel deployments",
+      ].join("\n"),
+    }),
+  });
+  const runId = ingest.json?.runId;
+  check("durable ingest starts", Boolean(runId), runId ?? "no run");
+
+  let run = null;
+  for (let i = 0; i < 40; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    run = await call(
+      `/_agent-native/actions/get-ingest-run?id=${encodeURIComponent(String(runId))}`,
+    );
+    if (run.json?.status !== "running") break;
+  }
+  check(
+    "durable ingest completes all three stages",
+    run?.json?.status === "complete" && run?.json?.progress === 100,
+    `${run?.json?.status} / ${run?.json?.progress}%`,
+  );
+
+  if (runId) {
+    const afterIngest = await call(
+      `/_agent-native/actions/get-incident?id=${encodeURIComponent(seed.id)}`,
+    );
+    for (const event of (afterIngest.json?.events ?? []).filter((row) =>
+      /Ingest check/.test(row.title),
+    )) {
+      await call("/_agent-native/actions/delete-incident-event", {
+        method: "DELETE",
+        body: JSON.stringify({ id: event.id }),
+      });
+    }
+  }
+
   const pack = [
     "2026-11-02 09:00 [alert] disk full on node-3 | node-exporter",
     "09:01 [error] writes fail with ENOSPC | app logs",
