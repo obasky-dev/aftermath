@@ -41,9 +41,11 @@ const auth = await call("/_agent-native/auth/local-dev", {
   method: "POST",
   body: "{}",
 });
+console.log("auth", auth.status, auth.text.slice(0, 160));
 check("local-dev sign-in", auth.status === 200, `status ${auth.status}`);
 
 const list = await call("/_agent-native/actions/list-incidents");
+console.log("list", list.status, (list.json?.incidents ?? []).length, list.text.slice(0, 160));
 for (const legacy of (list.json?.incidents ?? []).filter(
   (row) => row.title === "Checkout latency spike",
 )) {
@@ -56,6 +58,7 @@ const seeded = await call("/_agent-native/actions/seed-demo-incident", {
   method: "POST",
   body: "{}",
 });
+console.log("seed", seeded.status, seeded.text.slice(0, 600));
 const seed =
   list.json?.incidents?.find((row) => row.title === "Checkout API 5xx spike") ??
   (seeded.json?.incidentId
