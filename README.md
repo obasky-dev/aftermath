@@ -18,7 +18,7 @@ Timelines are usually wrong in small ways. Someone rebuilds them by hand from lo
 
 1. **Read the original story.** The r-482 deploy is at **13:40**, but the incident channel says it was promoted at **14:02**. Onset is **14:05**. The database failover at 14:00 leads at **5 minutes**; exposure is **43 minutes**.
 2. **Correct it.** One click (*Try the correction*) moves the deploy to the promotion time, **14:02**.
-3. **Watch the conclusion change.** The deploy now leads at **3 minutes**; exposure drops to **21 minutes**. The database failover becomes **outcompeted and contradicted** by the flat DB connection-error metric.
+3. **Watch the conclusion change.** The deploy now leads at **3 minutes**; exposure drops to **21 minutes**. The database failover becomes **outcompeted and contradicted** by the flat DB connection-error metric, and the conflict card offers one-click resolutions for both disputed times.
 4. **The postmortem updates itself.** The generated document includes the metrics, the candidate causes, and a **correction log**:
 
    > “r-482 deploy”: originally 13:40 UTC, corrected to 14:02 UTC.
@@ -37,6 +37,14 @@ Open **Import a pack** (`/incidents/new`), paste what you actually have — aler
 
 Then challenge it. **Challenge this correction** runs `challenge-incident`: what the new time contradicts, which nearby signal now coincides, which claims are unverified, and the one question that would settle it. The agent can answer that question using the same timeline.
 
+## The timeline is a real editor
+
+Drag any event to correct its time. While dragging, the label shows the exact minute and a ghost marker holds the original position. Arrow keys move the focused event one minute; **Shift + arrows** move five. Zoom with **⌘/Ctrl + scroll**, pan with **Shift + scroll** or by dragging empty canvas, and undo/redo with **⌘/Ctrl + Z**. Low-confidence events are drawn with dashed labels, and the paperclip badge opens the evidence that supports the event — source, link and excerpt — without leaving the timeline.
+
+## Where the two stories disagree
+
+`list-conflicts` returns the unresolved disagreements as question cards: the record versus the channel, or the suspect versus the metric that contradicts it. Each card carries both events with time and confidence, and resolutions are exact `update-incident-event` patches. The **Accept the evidence** option marks the disputed event as a red herring, which removes it from the candidate causes and reruns the analysis. The agent gets the same cards and the same patches; it cannot resolve a question by prose alone.
+
 ## Automation
 
 The incidents page installs a **token-protected alert webhook**. POST an alert and the incident, plus its first event, are created immediately — no model call and no screen in the loop:
@@ -50,6 +58,18 @@ curl -X POST http://localhost:8080/api/ingest-alert \
 
 The same operation is the `create-incident-from-alert` action, so the agent can call it when a person reports an alert in chat. A wrong token returns **401**; the alert source is kept as the incident's first timeline event.
 
+## Generative UI and the incident team
+
+Four actions declare a native chat card: `analyze-incident` shows the verdict, the four metrics and the leading theory; `simulate-rollback` renders a slider that recomputes exposure from the real window; `list-conflicts` renders the two-sided conflict cards with resolutions; `challenge-incident` renders the objections and the settling question. The cards are registered once in `app/components/chat/aftermath-cards.tsx`; the renderer reads the full action result rather than a projected summary, so the card and the page cannot disagree.
+
+For a multi-step review the agent can spawn framework agent teams. The `.agents/skills/incident-team/SKILL.md` roles are Log Analyst, Pattern Analyst, Comms Writer and Remediation Engineer. Every role calls the deterministic actions, every number comes from an action result, and the parent attributes each role's output. Sub-agents cannot approve or ship.
+
+## Recurrence memory and detection gap
+
+`find-similar-incidents` compares the open incident with seeded past postmortems and returns the closest failure mode with its shared keywords. There are no embeddings in this build, so the method is explicitly labelled a keyword fallback — never presented as semantic search.
+
+`detection-gap` compares the earliest sustained failure with the page time and proposes a concrete metric, threshold and duration. The demo incident's gap is one minute; the suggestion becomes an action item rather than a vague "improve monitoring".
+
 ## Share and export
 
 - **Share** copies a public, read-only postmortem link (`/share/<token>`). The page renders without a session: same document, no app chrome.
@@ -62,7 +82,7 @@ The same operation is the `create-incident-from-alert` action, so the agent can 
 
 Approval is a checklist, not a button. `get-readiness` verifies the impact window, the marked cause, owner teams, a detection item, a prevention item, blame-free language, and that no competing theory is still plausible. `lint-blame` lists any individual-blaming sentence with a systemic rewrite.
 
-`get-summaries` renders the same computed facts for engineers, executives and customers. Approving creates five artifacts from the incident: Linear issues for the action items, a GitHub draft PR for the prevention work, a Slack post, a Statuspage draft and a Notion export. Until provider credentials are connected these are stored as **fixture** artifacts and labelled `fixture` in the UI; nothing claims to be live.
+`get-summaries` renders the same computed facts for engineers, executives and customers. Approving creates seven artifacts from the incident: three Linear issues for the action items, a GitHub draft PR for the prevention work, a Slack post, a Statuspage draft and a Notion export. Until provider credentials are connected these are stored as **fixture** artifacts and labelled `fixture` in the UI; nothing claims to be live.
 
 ## Connections
 
@@ -93,14 +113,18 @@ No live provider credentials are connected in this build. The provider calls are
 | Action | What it does |
 | --- | --- |
 | `list-incidents` | Incidents, newest first; optional text, severity and status filters |
-| `get-incident` | One incident with its timeline (current and original times) and action items |
+| `get-incident` | One incident with its timeline (current and original times), evidence links on every event, and action items |
 | `create-incident` | Create an incident |
 | `create-incident-from-alert` | Create an incident from an alert; also powers the inbound webhook |
 | `create-incident-from-pack` | Parse a pasted pack into a full timeline and store every event with its source |
 | `add-incident-event` | Add one event, for lines found in a conversation |
-| `update-incident-event` | Correct an event's time, title, detail, confidence or suspected-cause flag |
+| `update-incident-event` | Correct an event's time, title, detail, confidence, suspected-cause flag or conflict resolution (`eventStatus`) |
 | `analyze-incident` | Deterministic verdict for the **current** or **original** timeline: consistent / weak / contradicted, impact window, nearest signal |
 | `challenge-incident` | Evidence-based objections, the unverified claims, and the question that would settle it |
+| `list-conflicts` | Unresolved timing and causal conflicts as question cards, with the exact resolution patches |
+| `find-similar-incidents` | Recurrence memory over past incidents; keyword similarity, labelled as the fallback method |
+| `detection-gap` | Onset-to-page gap and a concrete alert rule suggestion |
+| `simulate-rollback` | What-if exposure if the rollback landed at a given time, computed from the real window |
 | `generate-postmortem` | The postmortem as Markdown, with a correction log and the discussion |
 | `approve-postmortem` | Owner-only approval (UI capability required) |
 | `create-postmortem-share` | Create or return the public read-only share token (hidden from the model) |
@@ -112,6 +136,8 @@ No live provider credentials are connected in this build. The provider calls are
 | `get-summaries` | Engineer, executive and customer views from the same computed facts |
 | `create-postmortem-artifacts` | Create the draft Linear/GitHub/Slack/Statuspage/Notion artifacts (fixture-labelled) |
 | `get-postmortem-artifacts` | List the artifacts created for an incident |
+| `start-ingest` | Start the durable Log Analyst → Pattern Analyst → Comms Writer run |
+| `get-ingest-run` | Read a durable run's stage, progress and output |
 | `list-integrations` | Provider catalog, connection state and evidence coverage |
 | `connect-integration` | Connect a provider in fixture mode (hidden from the model) |
 | `disconnect-integration` | Disconnect a provider (hidden from the model) |
@@ -119,7 +145,7 @@ No live provider credentials are connected in this build. The provider calls are
 | `send-integration-fixture` | Append one provider-shaped fixture event to the timeline |
 | `list-integration-deliveries` | Recent deliveries, newest first |
 | `delete-incident-event` | Delete an event and its evidence (hidden from the model) |
-| `install-alert-webhook` | Return the alert webhook path and token (setup only; hidden from the model) |
+| `install-alert-webhook` | Return the alert webhook path, token, HMAC secret and Slack signing secret (setup only; hidden from the model) |
 | `delete-incident` | Remove an incident and its children (cleanup; hidden from the model) |
 | `seed-demo-incident` | Load the demo incident (idempotent; hidden from the model) |
 

@@ -689,7 +689,7 @@ try {
   check("an unsigned Slack command is rejected", badSlack.status === 401, `status ${badSlack.status}`);
 
   const moveBody = new URLSearchParams({
-    text: `move ${seed.id} r-482 14:04`,
+    text: `move ${seed.id} r-482 deploy 14:04`,
   }).toString();
   const slackMove = await fetch(`${BASE}/api/slack/aftermath`, {
     method: "POST",

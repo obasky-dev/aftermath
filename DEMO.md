@@ -29,12 +29,13 @@ Point at the comparison panel and the numbers:
 - The deploy is **25 minutes early**, so it is outcompeted.
 - Exposure is **43 minutes**.
 - Metrics: detect 25, acknowledge 4, mitigate 14, resolve 18.
+- The deploy's label is **dashed** at 45% confidence; click the paperclip to show its build-log evidence.
 
 ### 0:45 — The correction
 
 Say: *"The incident channel says r-482 was promoted at 14:02, not built at 13:40."*
 
-Click **Try the correction** (or drag the deploy to 14:02).
+Click **Try the correction** (or drag the deploy to 14:02). While dragging, point at the ghost marker holding **13:40** and the exact time on the cursor. Press **⌘/Ctrl + Z** once to undo, then redo it — the numbers animate and show a `was 25` diff chip.
 
 Point at the change:
 
@@ -43,7 +44,13 @@ Point at the change:
 - The database failover becomes **outcompeted and contradicted** by the flat DB connection-error metric.
 - The candidate-causes panel shows the contradiction with its evidence.
 
-### 1:15 — The challenge
+### 1:05 — The conflict cards
+
+Scroll to **Evidence conflicts**. Two cards are open: the recorded deploy time versus the channel claim, and the failover versus the flat connection metric.
+
+Say: *"The app does not guess when two sources disagree."* Click **Accept the evidence** on the causal card. It marks the failover as a red herring, removes it from the candidate causes and reruns the analysis. The card disappears.
+
+### 1:20 — The challenge
 
 Click **Challenge this correction**. Read the strongest objection and the settling question. Optionally click **Ask the agent to answer** and let the sidebar respond.
 
@@ -57,10 +64,14 @@ Scroll to the postmortem:
 
 - **Review & ship**: seven readiness checks are green.
 - Switch audience tabs: engineer, executive, customer.
-- Click **Approve & ship**. Five artifacts appear: Linear issues, GitHub draft PR, Slack post, Statuspage draft, Notion export. Say: *"These are fixture-backed until provider credentials are connected — the labels say so."*
+- Click **Approve & ship**. Seven artifacts appear: three Linear issues, a GitHub draft PR, a Slack post, a Statuspage draft and a Notion export. Say: *"These are fixture-backed until provider credentials are connected — the labels say so."*
 - Click **Share** to copy the public, read-only postmortem link. Optionally open it logged out.
 
-### 2:40 — Close
+### 2:40 — Optional: the same action from Slack
+
+If the Slack app is configured, run `/aftermath move <incidentId> r-482 14:04`. The command is signed with Slack's secret, returns the new verdict, and the app updates live. If it is not configured, skip this beat.
+
+### 2:50 — Close
 
 Say: *"The human corrects the record. The agent recomputes it. The postmortem cites the correction."*
 
@@ -71,6 +82,7 @@ Say: *"The human corrects the record. The agent recomputes it. The postmortem ci
 - **Seed missing**: click **Load demo incident**.
 - **Durable ingest stalls**: it is optional; cut to the postmortem.
 - **Connections**: `/connections` is a separate 30-second breadth beat, not required in the main story.
+- **Slack not configured**: skip the Slack beat; say "one action, three callers" while pointing at the drag and the agent button instead.
 
 ## Honesty rules
 

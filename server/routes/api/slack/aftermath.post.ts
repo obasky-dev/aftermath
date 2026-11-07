@@ -138,12 +138,20 @@ export default defineEventHandler(async (event) => {
         })
         .from(schema.incidentEvents)
         .where(eq(schema.incidentEvents.incidentId, incidentId));
-      const match = rows.find((row) =>
+      const matches = rows.filter((row) =>
         row.title.toLowerCase().includes(query.toLowerCase()),
       );
-      if (!match) {
+      if (matches.length === 0) {
         return reply(`No event on ${incidentId} matches "${query}".`);
       }
+      if (matches.length > 1) {
+        return reply(
+          `"${query}" matches ${matches.length} events: ${matches
+            .map((row) => `*${row.title}* (${utcTime(row.at)})`)
+            .join(", ")}. Say more of the title so the move is unambiguous.`,
+        );
+      }
+      const match = matches[0]!;
       const hours = Number(time!.slice(0, 2));
       const minutes = Number(time!.slice(3, 5));
       if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours > 23 || minutes > 59) {
