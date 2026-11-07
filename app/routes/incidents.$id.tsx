@@ -599,6 +599,8 @@ function IncidentDetail({ id }: { id: string }) {
 
           <aside className="space-y-7 print:hidden">
             <RollbackTuner id={id} exposure={current?.exposure} />
+            <SimilarIncidentsCard id={id} />
+            <DetectionGapCard id={id} />
             <section>
               <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                 Strongest signals
@@ -1135,6 +1137,48 @@ function RollbackTuner({
           </p>
         </>
       ) : null}
+    </section>
+  );
+}
+
+function SimilarIncidentsCard({ id }: { id: string }) {
+  const query = useActionQuery("find-similar-incidents", { id });
+  const match = query.data?.matches?.[0];
+  if (!match) return null;
+
+  return (
+    <section aria-label="Similar past incidents">
+      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        Resembles
+      </h2>
+      <p className="mt-2 text-sm font-medium leading-snug">{match.title}</p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{match.summary}</p>
+      <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+        score {match.score} · {match.sharedKeywords.join(", ")}
+      </p>
+      <p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-muted-foreground/70">
+        {query.data?.method}
+      </p>
+    </section>
+  );
+}
+
+function DetectionGapCard({ id }: { id: string }) {
+  const query = useActionQuery("detection-gap", { id });
+  const gap = query.data?.gapMinutes;
+  if (gap === null || gap === undefined) return null;
+
+  return (
+    <section aria-label="Detection gap">
+      <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        Detection gap
+      </h2>
+      <p className="mt-2 text-sm">
+        Onset to page: <strong className="font-semibold">{gap} min</strong>
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        {query.data?.suggestion}
+      </p>
     </section>
   );
 }

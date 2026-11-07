@@ -178,6 +178,57 @@ const seedActionItems = [
   },
 ];
 
+const seedPastIncidents = [
+  {
+    title: "Checkout API pool exhaustion after config change",
+    summary:
+      "DB connection pool max lowered from 40 to 4; 5xx rate hit 18% after promotion. Rollback restored traffic.",
+    rootCauseTag: "pool-exhaustion",
+  },
+  {
+    title: "Search API latency after index rebuild",
+    summary:
+      "Search p95 tripled after a reindex; a query planner regression caused full scans.",
+    rootCauseTag: "index",
+  },
+  {
+    title: "Payments timeout after provider SDK upgrade",
+    summary:
+      "Provider calls timed out after an SDK upgrade; the retry loop amplified load.",
+    rootCauseTag: "dependency",
+  },
+  {
+    title: "CDN 5xx after DNS change",
+    summary:
+      "Edge 5xx after a nameserver change; TTL propagation took 30 minutes.",
+    rootCauseTag: "dns",
+  },
+  {
+    title: "Login failures after auth config change",
+    summary:
+      "Session cookie domain changed; users were logged out and sign-in failed.",
+    rootCauseTag: "config",
+  },
+  {
+    title: "Queue backlog after worker deploy",
+    summary:
+      "Workers consumed an old message schema; the backlog grew for 40 minutes.",
+    rootCauseTag: "deploy",
+  },
+  {
+    title: "Image uploads failing at storage quota",
+    summary:
+      "Uploads returned 500 after the bucket quota was hit.",
+    rootCauseTag: "quota",
+  },
+  {
+    title: "API errors after certificate rotation",
+    summary:
+      "Clients rejected the new certificate chain after rotation.",
+    rootCauseTag: "certificate",
+  },
+];
+
 export default defineAction({
   description:
     "Seed the demo incident with a full timeline, evidence, hypotheses and action items. Idempotent: returns the existing incident if already seeded.",
@@ -192,6 +243,27 @@ export default defineAction({
   }),
   run: async (_args, ctx) => {
     const db = getDb();
+    const owner = {
+      ownerEmail: ctx?.userEmail ?? "",
+      orgId: ctx?.orgId ?? null,
+    };
+
+    const [existingPast] = await db
+      .select({ id: schema.pastIncidents.id })
+      .from(schema.pastIncidents)
+      .limit(1);
+    if (!existingPast) {
+      for (const past of seedPastIncidents) {
+        await db.insert(schema.pastIncidents).values({
+          id: newId("past"),
+          title: past.title,
+          summary: past.summary,
+          rootCauseTag: past.rootCauseTag,
+          ...owner,
+        });
+      }
+    }
+
     const [existing] = await db
       .select({ id: schema.incidents.id })
       .from(schema.incidents)

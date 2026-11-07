@@ -387,6 +387,26 @@ try {
     }
   }
 
+  const similar = await call(
+    `/_agent-native/actions/find-similar-incidents?id=${encodeURIComponent(seed.id)}`,
+  );
+  check(
+    "recurrence memory finds the pool-exhaustion match",
+    (similar.json?.matches ?? []).length > 0 &&
+      /pool/i.test(similar.json.matches[0]?.title ?? "") &&
+      similar.json.matches[0]?.score > 0,
+    similar.json?.matches?.[0]?.title ?? "no match",
+  );
+
+  const gap = await call(
+    `/_agent-native/actions/detection-gap?id=${encodeURIComponent(seed.id)}`,
+  );
+  check(
+    "detection gap is one minute with a concrete rule",
+    gap.json?.gapMinutes === 1 && /5xx/.test(gap.json?.suggestion ?? ""),
+    `${gap.json?.gapMinutes} min`,
+  );
+
   const pack = [
     "2026-11-02 09:00 [alert] disk full on node-3 | node-exporter",
     "09:01 [error] writes fail with ENOSPC | app logs",

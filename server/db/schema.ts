@@ -142,3 +142,14 @@ export const ingestRuns = pgTable("ingest_runs", {
     .notNull()
     .default(sql`now()`),
 });
+
+export const pastIncidents = pgTable("past_incidents", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  summary: text("summary").notNull(),
+  rootCauseTag: text("root_cause_tag"),
+  ...ownableColumns(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`now()`),
+});

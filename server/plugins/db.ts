@@ -163,6 +163,20 @@ CREATE INDEX IF NOT EXISTS integration_deliveries_provider_idx ON integration_de
 );
 CREATE INDEX IF NOT EXISTS ingest_runs_status_idx ON ingest_runs (status, started_at)`,
     },
+    {
+      version: 8,
+      name: "past-incidents",
+      sql: `CREATE TABLE IF NOT EXISTS past_incidents (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  root_cause_tag TEXT,
+  owner_email TEXT NOT NULL DEFAULT '',
+  org_id TEXT,
+  visibility TEXT NOT NULL DEFAULT 'private',
+  created_at TEXT NOT NULL DEFAULT (now())
+)`,
+    },
   ],
   { table: "blameless_migrations" },
 );
