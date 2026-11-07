@@ -10,7 +10,7 @@ Tracked here so nothing is hardcoded or committed. Secrets belong in `.env` (git
 
 ## Live deployment
 
-Deployed 2026-11-07 at **https://aftermath-funkeojekale.vercel.app** (Vercel project `funkeojekale/aftermath`, Neon free Postgres, release migrations applied).
+Deployed 2026-11-07 at **https://aftermath-live.vercel.app** (Vercel project `aftermath`, Neon free Postgres, release migrations applied).
 
 Set in the Vercel production environment:
 
