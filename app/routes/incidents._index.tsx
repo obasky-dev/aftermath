@@ -48,6 +48,8 @@ export default function IncidentsIndex() {
     path: string;
     token: string;
     secret: string;
+    slackPath: string;
+    slackSigningSecret: string;
   } | null>(null);
   const [curlCopied, setCurlCopied] = useState(false);
   const [testState, setTestState] = useState<
@@ -88,6 +90,8 @@ export default function IncidentsIndex() {
               path: result.path,
               token: result.token,
               secret: result.secret ?? "",
+              slackPath: result.slackPath ?? "/api/slack/aftermath",
+              slackSigningSecret: result.slackSigningSecret ?? "",
             });
           }
         },
@@ -301,6 +305,30 @@ export default function IncidentsIndex() {
                   </p>
                   <pre className="mt-2 overflow-x-auto rounded-sm bg-muted px-2 py-1 font-mono text-[10px]">
                     {automation.secret}
+                  </pre>
+                </details>
+              ) : null}
+              {automation.slackSigningSecret ? (
+                <details className="mt-3 rounded-sm border border-border bg-background/60 p-3">
+                  <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Slack slash command
+                  </summary>
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    Point a Slack slash command at{" "}
+                    <code className="font-mono">
+                      {origin}
+                      {automation.slackPath}
+                    </code>{" "}
+                    and paste this signing secret into the Slack app. Slack signs each
+                    request; the command runs the same move action as the timeline.
+                  </p>
+                  <p className="mt-2 font-mono text-[10px] text-muted-foreground">
+                    /aftermath status &lt;incidentId&gt;
+                    <br />
+                    /aftermath move &lt;incidentId&gt; &lt;event text&gt; &lt;HH:MM&gt;
+                  </p>
+                  <pre className="mt-2 overflow-x-auto rounded-sm bg-muted px-2 py-1 font-mono text-[10px]">
+                    {automation.slackSigningSecret}
                   </pre>
                 </details>
               ) : null}

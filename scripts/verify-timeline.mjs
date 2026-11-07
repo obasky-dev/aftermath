@@ -651,6 +651,65 @@ try {
       body: JSON.stringify({ id: signedJson.id }),
     });
   }
+
+  const slackSecret = String(installed.json?.slackSigningSecret ?? "");
+  const slackTimestamp = String(Math.floor(Date.now() / 1000));
+  function slackHeaders(body) {
+    return {
+      "content-type": "application/x-www-form-urlencoded",
+      "x-slack-request-timestamp": slackTimestamp,
+      "x-slack-signature": `v0=${createHmac("sha256", slackSecret)
+        .update(`v0:${slackTimestamp}:${body}`)
+        .digest("hex")}`,
+    };
+  }
+  const statusBody = new URLSearchParams({ text: `status ${seed.id}` }).toString();
+  const slackStatus = await fetch(`${BASE}/api/slack/aftermath`, {
+    method: "POST",
+    headers: slackHeaders(statusBody),
+    body: statusBody,
+  });
+  const slackStatusJson = await slackStatus.json().catch(() => null);
+  check(
+    "the signed Slack command reads the verdict",
+    slackStatus.status === 200 &&
+      /CONSISTENT/i.test(String(slackStatusJson?.text ?? "")),
+    `${slackStatus.status} ${String(slackStatusJson?.text ?? "").slice(0, 48)}`,
+  );
+
+  const badSlack = await fetch(`${BASE}/api/slack/aftermath`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      "x-slack-request-timestamp": slackTimestamp,
+      "x-slack-signature": "v0=bad",
+    },
+    body: statusBody,
+  });
+  check("an unsigned Slack command is rejected", badSlack.status === 401, `status ${badSlack.status}`);
+
+  const moveBody = new URLSearchParams({
+    text: `move ${seed.id} r-482 14:04`,
+  }).toString();
+  const slackMove = await fetch(`${BASE}/api/slack/aftermath`, {
+    method: "POST",
+    headers: slackHeaders(moveBody),
+    body: moveBody,
+  });
+  const slackMoveJson = await slackMove.json().catch(() => null);
+  const afterSlackMove = await call(
+    `/_agent-native/actions/get-incident?id=${encodeURIComponent(seed.id)}`,
+  );
+  const movedBySlack = (afterSlackMove.json?.events ?? []).find(
+    (event) => event.id === root.id,
+  );
+  check(
+    "the Slack command moves the same event row",
+    slackMove.status === 200 &&
+      movedBySlack?.at === "2026-11-04T14:04:00.000Z" &&
+      /Moved/.test(String(slackMoveJson?.text ?? "")),
+    movedBySlack?.at ?? "not moved",
+  );
 } finally {
   if (root) {
     await call("/_agent-native/actions/update-incident-event", {

@@ -1,9 +1,7 @@
-import { defineAction, fail } from "@agent-native/core/action";
-import { eq } from "drizzle-orm";
+import { defineAction } from "@agent-native/core/action";
 import { z } from "zod";
 
-import { getDb, schema } from "../server/db/index.js";
-import { toIso } from "../server/lib/incidents.js";
+import { updateIncidentEvent } from "../server/lib/incidents.js";
 
 export default defineAction({
   description:
@@ -41,49 +39,5 @@ export default defineAction({
     isRootCause: z.boolean(),
     eventStatus: z.string(),
   }),
-  run: async (args) => {
-    const { incidentEvents } = schema;
-    const [existing] = await getDb()
-      .select({ at: incidentEvents.at, originalAt: incidentEvents.originalAt })
-      .from(incidentEvents)
-      .where(eq(incidentEvents.id, args.id))
-      .limit(1);
-    if (!existing) {
-      fail("Event not found.", { errorCode: "not_found", statusCode: 404 });
-    }
-
-    const patch: Record<string, unknown> = {};
-    if (args.at !== undefined) {
-      patch.at = toIso(args.at, "at");
-      // The first correction preserves the time the timeline originally had.
-      if (existing.originalAt === null) patch.originalAt = existing.at;
-    }
-    if (args.title !== undefined) patch.title = args.title;
-    if (args.detail !== undefined) patch.detail = args.detail;
-    if (args.confidence !== undefined) patch.confidence = args.confidence;
-    if (args.isRootCause !== undefined) patch.isRootCause = args.isRootCause;
-    if (args.eventStatus !== undefined) patch.eventStatus = args.eventStatus;
-    if (Object.keys(patch).length === 0) {
-      fail("Send at least one field to update.", {
-        errorCode: "empty_patch",
-      });
-    }
-
-    const [row] = await getDb()
-      .update(incidentEvents)
-      .set(patch)
-      .where(eq(incidentEvents.id, args.id))
-      .returning({
-        id: incidentEvents.id,
-        at: incidentEvents.at,
-        title: incidentEvents.title,
-        confidence: incidentEvents.confidence,
-        isRootCause: incidentEvents.isRootCause,
-        eventStatus: incidentEvents.eventStatus,
-      });
-    if (!row) {
-      fail("Event not found.", { errorCode: "not_found", statusCode: 404 });
-    }
-    return row;
-  },
+  run: async (args) => updateIncidentEvent(args.id, args),
 });

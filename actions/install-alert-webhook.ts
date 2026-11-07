@@ -21,11 +21,18 @@ export default defineAction({
     token: z.string(),
     secret: z.string(),
     signatureHeader: z.string(),
+    slackPath: z.string(),
+    slackSigningSecret: z.string(),
     ownerEmail: z.string(),
   }),
   run: async ({ rotate }, ctx) => {
     const existing = (await getSetting(SETTING)) as
-      | { token?: string; secret?: string; ownerEmail?: string }
+      | {
+          token?: string;
+          secret?: string;
+          slackSigningSecret?: string;
+          ownerEmail?: string;
+        }
       | null;
     const ownerEmail = ctx?.userEmail ?? existing?.ownerEmail ?? "";
     const token =
@@ -36,13 +43,20 @@ export default defineAction({
       !rotate && typeof existing?.secret === "string" && existing.secret.length > 0
         ? existing.secret
         : randomBytes(32).toString("base64url");
+    const slackSigningSecret =
+      !rotate &&
+      typeof existing?.slackSigningSecret === "string" &&
+      existing.slackSigningSecret.length > 0
+        ? existing.slackSigningSecret
+        : randomBytes(32).toString("base64url");
 
     if (
       token !== existing?.token ||
       secret !== existing?.secret ||
+      slackSigningSecret !== existing?.slackSigningSecret ||
       ownerEmail !== existing?.ownerEmail
     ) {
-      await putSetting(SETTING, { token, secret, ownerEmail });
+      await putSetting(SETTING, { token, secret, slackSigningSecret, ownerEmail });
     }
 
     return {
@@ -50,6 +64,8 @@ export default defineAction({
       token,
       secret,
       signatureHeader: "sha256=HMAC_SHA256(secret, `${x-aftermath-timestamp}.${rawBody}`)",
+      slackPath: "/api/slack/aftermath",
+      slackSigningSecret,
       ownerEmail,
     };
   },
