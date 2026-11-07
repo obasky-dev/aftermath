@@ -34,7 +34,7 @@ async function call(path, init = {}) {
   } catch {
     json = null;
   }
-  return { status: response.status, json, text };
+  return { status: response.status, json, text, setCookies };
 }
 
 const auth = await call("/_agent-native/auth/local-dev", {
@@ -42,6 +42,7 @@ const auth = await call("/_agent-native/auth/local-dev", {
   body: "{}",
 });
 console.log("auth", auth.status, auth.text.slice(0, 160));
+console.log("auth cookies", JSON.stringify(auth.setCookies), "sent", cookie);
 check("local-dev sign-in", auth.status === 200, `status ${auth.status}`);
 
 const list = await call("/_agent-native/actions/list-incidents");
