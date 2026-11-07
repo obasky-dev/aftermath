@@ -8,19 +8,18 @@ Tracked here so nothing is hardcoded or committed. Secrets belong in `.env` (git
 - **GitHub CLI**: authenticated as `obasky-dev` with `repo` scope.
 - **Builder.io model connection**: configured in the app (`claude-haiku-5-5`), 15 requests/day on the free tier.
 
-## Needed for a live deployment
+## Live deployment
 
-- `DATABASE_URL` — a hosted Postgres (Neon or Vercel Postgres). The production server refuses local PGlite by design.
-- `BETTER_AUTH_SECRET` — a random 32-byte secret.
-- `SECRETS_ENCRYPTION_KEY` — a random 32-byte secret.
-- `AGENT_NATIVE_RELEASE_MIGRATIONS=1`.
-- A model key if not using a signed-in Builder session (`BUILDER_PRIVATE_KEY` or `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`).
+Deployed 2026-11-07 at **https://aftermath-funkeojekale.vercel.app** (Vercel project `funkeojekale/aftermath`, Neon free Postgres, release migrations applied).
 
-A `vercel.json` for the Nitro Vercel preset has not been added yet. The reference command is:
+Set in the Vercel production environment:
 
-```
-NITRO_PRESET=vercel pnpm build && pnpm migrate:production
-```
+- `DATABASE_URL` — supplied by the Neon integration (pooled; `DATABASE_URL_UNPOOLED` was used for migrations).
+- `BETTER_AUTH_SECRET`, `SECRETS_ENCRYPTION_KEY`, `CRON_SECRET` — random 32-byte secrets.
+- `AGENT_NATIVE_RELEASE_MIGRATIONS=1`, `AGENT_NATIVE_HOSTED_HARNESS=true`.
+- `AGENT_NATIVE_VERCEL_CRON_SCHEDULE=0 9 * * *` — Hobby plans reject the framework's per-minute sweep.
+
+`vercel.json` builds the Nitro Vercel output (`NITRO_PRESET=vercel pnpm build`). Sign-in is enabled; the public demo account is `demo@aftermath.app` / `Aftermath-demo-2026`. No model key is deployed, so the deterministic timeline works but the chat agent asks for a provider key until one is connected.
 
 ## Needed for live integrations
 

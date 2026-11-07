@@ -84,6 +84,7 @@ Four actions declare `chatUI` renderers (`aftermath.analysis-card`, `aftermath.r
 
 ## Known limits
 
+- The live deployment has no model key, so the agent chat is unavailable until a provider key is connected.
 - No live provider credentials are connected. Every connection/artifact is labelled fixture (**UNVERIFIED-LIVE**).
 - Outbound retry/backoff is not implemented for fixture deliveries.
 - Recurrence memory is keyword Jaccard, not embeddings; the UI says so.

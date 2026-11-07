@@ -23,7 +23,7 @@ Each primitive named in the build contract, mapped to the real API or file used 
 
 - The contract asks for **live** GitHub, Vercel, Slack, Linear, PagerDuty, Sentry, Supabase and Cloudflare adapters. This build ships the connection surface, normalized fixture adapters and real inbound HMAC/idempotency, clearly labelled. No live provider credential is connected; these are **UNVERIFIED-LIVE**.
 - Outbound retry/backoff is not implemented for fixture deliveries. The Slack Web API path uses the framework provider-API runtime with approval, and pauses for a workspace connection.
-- **Deployment** is not done: the production server requires hosted Postgres and no `DATABASE_URL` exists.
+- **Deployment** is live on Vercel with Neon Postgres. The deployed app has no model key, so the chat agent asks for one; every deterministic surface works.
 - **Browser automation** for drag/zoom/undo and the chat cards is not in CI; SSR and all actions are.
 - Recurrence memory uses a **keyword fallback**, labelled, not embeddings.
 

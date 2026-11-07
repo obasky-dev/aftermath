@@ -1,0 +1,16 @@
+node_modules
+.git
+data
+build
+dist
+dist-ssr
+.output
+.netlify
+.vercel
+.react-router
+.generated
+.tmp
+logs
+*.log
+.env
+.env.*

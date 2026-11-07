@@ -4,6 +4,21 @@
 
 Built for the [Agent-Native Hackathon](https://www.builder.io/hackathon) on Builder.io's open-source [Agent-Native](https://agent-native.com) framework.
 
+## Live demo
+
+**https://aftermath-funkeojekale.vercel.app**
+
+Sign in with the public demo account:
+
+- email: `demo@aftermath.app`
+- password: `Aftermath-demo-2026`
+
+The demo data is fictional. The account is public on purpose; use the **Import a pack** screen or re-run `seed-demo-incident` if the timeline has been changed. The read-only postmortem for the seeded incident is also public:
+
+**https://aftermath-funkeojekale.vercel.app/share/03UOScRIovmxePovSGf__I3S**
+
+Deployment runs on Vercel with hosted Neon Postgres, release migrations applied. Sign-in is enabled; the demo account is the shortcut for reviewers.
+
 ![Aftermath landing page](docs/screenshots/landing.png)
 
 ---
@@ -174,6 +189,8 @@ No live provider credentials are connected in this build. The provider calls are
 | One-click resolution | `eventStatus: red_herring` persists and the conflict disappears from `list-conflicts` |
 | Slack command | Signed `status` returns the verdict; unsigned returns 401; signed `move` changes the same event row to 14:04 |
 | Pages render | `/incidents`, `/connections` and `/incidents/:id` return 200 with their SSR title and no error page |
+| Live deployment | `aftermath-funkeojekale.vercel.app` serves the app parked out, signs in the demo account, lists the seeded incident, and returns `weak / 25 / 43` from `analyze-incident` |
+| Public share on live | `/share/03UOScRIovmxePovSGf__I3S` returns 200 without a session |
 | Evidence links | The suspected cause carries its build-log evidence over HTTP |
 | Incident list and detail | HTTP 200 |
 

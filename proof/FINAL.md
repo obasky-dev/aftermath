@@ -31,6 +31,7 @@ Every line below is from the GitHub Actions run for commit `3a190ea`, not a hand
 | HMAC intake | valid signature accepted; stale signature 401 |
 | Slack command | signed `status` returns `CONSISTENT`; unsigned 401; signed `move` lands on the same event row |
 | Pages | `/incidents`, `/connections`, `/incidents/:id` return 200 with their SSR title and no error page |
+| Live deployment (2026-11-07) | `https://aftermath-funkeojekale.vercel.app` — public with sign-in; demo account lists the seeded incident; `analyze-incident` returns `weak / 25 / 43`; `/share/03UO…` returns 200 logged out |
 
 ## Implemented, not browser-automated
 
@@ -46,7 +47,8 @@ These are typechecked and their actions are proven over HTTP, but no headless-br
 
 - **Live provider adapters**: GitHub, Vercel, Linear, PagerDuty, Sentry, Supabase and Cloudflare remain fixture-backed and labelled. No credential exists in this workspace. Marked **UNVERIFIED-LIVE**, as the contract requires.
 - **Real Slack workspace round-trip**: the signature scheme is verified with a locally generated signature; no Slack app is installed.
-- **Deployment**: no hosted Postgres (`DATABASE_URL`), so the production server (which refuses PGlite) is not deployed. Vercel CLI is authenticated but the project is not linked.
+- **Model connection in production**: no provider key is deployed, so the chat agent prompts for one. The deterministic timeline and every action work without it.
+- **Browser automation on the live URL**: the live checks are HTTP; drag/zoom/chat-card pixels are still not automated.
 - **Embeddings**: recurrence memory uses a keyword-Jaccard fallback and says so in the UI.
 - **Browser visual/a11y pass**: not run in this environment; CI covers SSR and HTTP only.
 - **Clips recording**: the owner's task.
