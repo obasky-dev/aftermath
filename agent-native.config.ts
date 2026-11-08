@@ -5,6 +5,6 @@ export default defineAgentNativeConfig({
   harness: true,
   agent: {
     engine: "ai-sdk:openrouter",
-    model: "nvidia/nemotron-3.5-lightning:free",
+    model: "nvidia/nemotron-3-ultra-550b-a55b:free",
   },
 });

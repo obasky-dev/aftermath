@@ -106,7 +106,7 @@ No live provider credentials are connected in this build. The provider calls are
 
 ## Model
 
-The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` via `defineAppConfig({ agent: { engine: "ai-sdk:openrouter", model: "nvidia/nemotron-3.5-lightning:free" } })`, mirrored in `agent-native.config.ts` for the build/client. The live deployment holds `OPENROUTER_API_KEY` as a Vercel secret, so the agent is available to every visitor without a connect step. Locally, put the same key in `.env.local` (git-ignored) or connect Builder.io in the app.
+The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` via `defineAppConfig({ agent: { engine: "ai-sdk:openrouter", model: "nvidia/nemotron-3-ultra-550b-a55b:free" } })`, mirrored in `agent-native.config.ts` for the build/client. The live deployment holds `OPENROUTER_API_KEY` as a Vercel secret, so the agent is available to every visitor without a connect step. The free OpenRouter catalog has no reliable non-reasoning tool model that also answers incident questions correctly; Ultra is the fastest one that does (tool call in ~4s), and it can answer with reasoning disabled at the API level. Locally, put the same key in `.env.local` (git-ignored) or connect Builder.io in the app.
 
 ## Why this is agent-native
 
@@ -194,7 +194,7 @@ The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` 
 | Public share on live | `/share/03UOScRIovmxePovSGf__I3S` returns 200 without a session |
 | Live click-through | Headless browser with no cookies: Try the correction → 3 min / 21 min / contradicted; Accept the evidence → no unresolved conflicts; no console errors |
 | Live write guard | `delete-incident` without a session returns 403; timeline edits succeed |
-| Live model | `/agent-engine/status` with no cookie: configured, `ai-sdk:openrouter`, `nvidia/nemotron-3.5-lightning:free`, `chatEligible: true`; a live turn rendered analysis cards without a connect prompt |
+| Live model | `/agent-engine/status` with no cookie: configured, `ai-sdk:openrouter`, `nvidia/nemotron-3-ultra-550b-a55b:free`, `chatEligible: true`; a live turn rendered analysis cards without a connect prompt |
 | Evidence links | The suspected cause carries its build-log evidence over HTTP |
 | Incident list and detail | HTTP 200 |
 
