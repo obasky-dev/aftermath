@@ -5,7 +5,7 @@
  * visitor makes in the picker is preserved on later visits.
  */
 const SELECTION = {
-  model: "nvidia/nemotron-3-ultra-550b-a55b:free",
+  model: "cohere/north-mini-code:free",
   engine: "ai-sdk:openrouter",
   effort: "none",
 } as const;
