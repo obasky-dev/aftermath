@@ -106,7 +106,7 @@ No live provider credentials are connected in this build. The provider calls are
 
 ## Model
 
-The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` via `defineAppConfig({ agent: { engine: "ai-sdk:openrouter", model: "nvidia/nemotron-3.5-lightning:free" } })`, mirrored in `agent-native.config.ts` for the build/client. The live deployment holds `OPENROUTER_API_KEY` as a Vercel secret, so the agent is available to every visitor without a connect step. The configured free model is a reasoning model: it spends tokens thinking before answering, so the first agent turn can take tens of seconds. The deterministic timeline and every non-agent surface are instant. Locally, put the same key in `.env.local` (git-ignored) or connect Builder.io in the app.
+The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` via `defineAppConfig({ agent: { engine: "ai-sdk:openrouter", model: "nvidia/nemotron-3.5-lightning:free" } })`, mirrored in `agent-native.config.ts` for the build/client. The live deployment holds `OPENROUTER_API_KEY` as a Vercel secret, so the agent is available to every visitor without a connect step. The configured free model is a reasoning model: it spends tokens thinking before answering, so the first agent turn can take tens of seconds. The OpenRouter key is a **free-tier key with 50 model requests per day**; one multi-step agent turn uses several requests, so the live agent can rate-limit after a few turns. The deterministic timeline and every non-agent surface are instant. For a heavier public demo, add OpenRouter credits or use a paid provider key. Locally, put the same key in `.env.local` (git-ignored) or connect Builder.io in the app.
 
 ## Why this is agent-native
 

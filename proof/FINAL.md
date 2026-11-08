@@ -34,7 +34,7 @@ Every line below is from the GitHub Actions run for commit `3a190ea`, not a hand
 | Live deployment (2026-11-07) | `https://aftermath-live.vercel.app` — opens without sign-in via the public-demo session; `/auth/session` returns the demo identity with no cookie; the seeded incident lists; `analyze-incident` returns `weak / 25 / 43`; `/share/03UO…` returns 200 logged out |
 | Live click-through | Headless Chromium, no cookies: **Try the correction** → `3 min`, `21 min`, failover `contradicted`; **Accept the evidence** → "No unresolved conflicts"; no console errors. Demo restored to 13:40 / weak / 25 / 43. |
 | Live write guard | `delete-incident` without a session returns **403** while timeline edits and conflict resolutions succeed |
-| Live model | `/agent-engine/status` with no cookie: `configured: true`, `ai-sdk:openrouter`, `nvidia/nemotron-3.5-lightning:free`, `source: env`, `chatEligible: true`. A live agent turn rendered the native analysis cards without a connect prompt. |
+| Live model | `/agent-engine/status` with no cookie: `configured: true`, `ai-sdk:openrouter`, `nvidia/nemotron-3.5-lightning:free`, `source: env`, `chatEligible: true`. A fresh browser receives the same model/engine in the composer selection. The free-tier key allows 50 requests/day; the live agent reports the provider rate limit when exhausted. |
 
 ## Implemented, not browser-automated
 
