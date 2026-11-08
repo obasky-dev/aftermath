@@ -21,6 +21,7 @@ import {
 } from "react-router";
 import type { LinksFunction } from "react-router";
 
+import "@/lib/chat-model-defaults";
 import "@/components/chat/aftermath-cards";
 import {
   KeyboardShortcutsDialog,
