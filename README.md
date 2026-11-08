@@ -106,7 +106,7 @@ No live provider credentials are connected in this build. The provider calls are
 
 ## Model
 
-The app is configured for OpenRouter in `agent-native.config.ts` (`engine: "ai-sdk:openrouter"`, `model: "nvidia/nemotron-3.5-lightning:free"`). The live deployment holds `OPENROUTER_API_KEY` as a Vercel secret, so the agent is available to every visitor without a connect step. Locally, put the same key in `.env.local` (git-ignored) or connect Builder.io in the app.
+The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` via `defineAppConfig({ agent: { engine: "ai-sdk:openrouter", model: "nvidia/nemotron-3.5-lightning:free" } })`, mirrored in `agent-native.config.ts` for the build/client. The live deployment holds `OPENROUTER_API_KEY` as a Vercel secret, so the agent is available to every visitor without a connect step. Locally, put the same key in `.env.local` (git-ignored) or connect Builder.io in the app.
 
 ## Why this is agent-native
 

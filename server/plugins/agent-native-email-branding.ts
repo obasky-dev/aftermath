@@ -11,4 +11,10 @@ export default defineAppConfig({
     // Optional: use your own absolute HTTPS logo URL in transactional emails.
     // logoUrl: "https://example.com/logo.png",
   },
+  // Runtime agent config. The engine reads OPENROUTER_API_KEY from the
+  // deployment environment, so no visitor is asked to connect a provider.
+  agent: {
+    engine: "ai-sdk:openrouter",
+    model: "nvidia/nemotron-3.5-lightning:free",
+  },
 });
