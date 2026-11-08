@@ -194,6 +194,7 @@ The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` 
 | Public share on live | `/share/03UOScRIovmxePovSGf__I3S` returns 200 without a session |
 | Live click-through | Headless browser with no cookies: Try the correction → 3 min / 21 min / contradicted; Accept the evidence → no unresolved conflicts; no console errors |
 | Live write guard | `delete-incident` without a session returns 403; timeline edits succeed |
+| Live model | `/agent-engine/status` with no cookie: configured, `ai-sdk:openrouter`, `nvidia/nemotron-3.5-lightning:free`, `chatEligible: true`; a live turn rendered analysis cards without a connect prompt |
 | Evidence links | The suspected cause carries its build-log evidence over HTTP |
 | Incident list and detail | HTTP 200 |
 
