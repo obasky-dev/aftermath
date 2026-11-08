@@ -5,8 +5,8 @@
  * preserved on later visits.
  */
 const SELECTION = {
-  model: "nvidia/nemotron-3.5-lightning:free",
-  engine: "ai-sdk:openrouter",
+  model: "qwen/qwen3.8-27b",
+  engine: "ai-sdk:openai",
   effort: "auto",
 } as const;
 
@@ -14,6 +14,7 @@ const SELECTION = {
 const PREVIOUS_DEFAULTS = new Set([
   "cohere/north-mini-code:free",
   "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-3.5-lightning:free",
 ]);
 
 const KEYS = [

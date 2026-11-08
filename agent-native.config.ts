@@ -4,7 +4,7 @@ export default defineAgentNativeConfig({
   changelog: { enabled: false },
   harness: true,
   agent: {
-    engine: "ai-sdk:openrouter",
-    model: "nvidia/nemotron-3.5-lightning:free",
+    engine: "ai-sdk:openai",
+    model: "qwen/qwen3.8-27b",
   },
 });

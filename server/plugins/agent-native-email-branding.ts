@@ -14,7 +14,7 @@ export default defineAppConfig({
   // Runtime agent config. The engine reads OPENROUTER_API_KEY from the
   // deployment environment, so no visitor is asked to connect a provider.
   agent: {
-    engine: "ai-sdk:openrouter",
-    model: "nvidia/nemotron-3.5-lightning:free",
+    engine: "ai-sdk:openai",
+    model: "qwen/qwen3.8-27b",
   },
 });
