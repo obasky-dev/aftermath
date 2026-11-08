@@ -104,6 +104,10 @@ Connect verifies the connection, Test records a delivery, and Send test event ap
 
 No live provider credentials are connected in this build. The provider calls are fixture-backed and labelled. Real GitHub, Vercel, Slack, Linear, PagerDuty, Sentry, Supabase and Cloudflare credentials would switch the same cards to `Connected (live)`.
 
+## Model
+
+The app is configured for OpenRouter in `agent-native.config.ts` (`engine: "ai-sdk:openrouter"`, `model: "nvidia/nemotron-3.5-lightning:free"`). The live deployment holds `OPENROUTER_API_KEY` as a Vercel secret, so the agent is available to every visitor without a connect step. Locally, put the same key in `.env.local` (git-ignored) or connect Builder.io in the app.
+
 ## Why this is agent-native
 
 - **One action, every surface.** `analyze-incident` is a typed function. The page calls it through a React hook, the agent calls it as a tool, and it is reachable over HTTP and the CLI. There is no second implementation of the verdict.
