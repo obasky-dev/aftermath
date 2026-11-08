@@ -5,6 +5,6 @@ export default defineAgentNativeConfig({
   harness: true,
   agent: {
     engine: "ai-sdk:openrouter",
-    model: "cohere/north-mini-code:free",
+    model: "nvidia/nemotron-3.5-lightning:free",
   },
 });

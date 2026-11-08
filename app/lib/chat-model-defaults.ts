@@ -1,14 +1,20 @@
 /**
  * Seed the composer's model selection before any chat mounts. The server pins
- * the same engine/model in defineAppConfig; this also pins reasoning to "none"
- * so the fast, non-reasoning path is the default for every visitor. A choice a
- * visitor makes in the picker is preserved on later visits.
+ * the same engine/model in defineAppConfig; this makes the configured model
+ * the default for every visitor. A choice a visitor makes in the picker is
+ * preserved on later visits.
  */
 const SELECTION = {
-  model: "cohere/north-mini-code:free",
+  model: "nvidia/nemotron-3.5-lightning:free",
   engine: "ai-sdk:openrouter",
-  effort: "none",
+  effort: "auto",
 } as const;
+
+// Earlier builds seeded these; move those visitors to the configured model.
+const PREVIOUS_DEFAULTS = new Set([
+  "cohere/north-mini-code:free",
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+]);
 
 const KEYS = [
   "agent-native:chat-models:selection",
@@ -20,7 +26,8 @@ if (typeof window !== "undefined") {
     try {
       const raw = window.localStorage.getItem(key);
       const current = raw ? (JSON.parse(raw) as { model?: unknown } | null) : null;
-      if (!current || typeof current.model !== "string" || current.model.length === 0) {
+      const model = typeof current?.model === "string" ? current.model : "";
+      if (!model || PREVIOUS_DEFAULTS.has(model)) {
         window.localStorage.setItem(key, JSON.stringify(SELECTION));
       }
     } catch {

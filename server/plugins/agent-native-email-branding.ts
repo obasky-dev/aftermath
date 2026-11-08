@@ -15,6 +15,6 @@ export default defineAppConfig({
   // deployment environment, so no visitor is asked to connect a provider.
   agent: {
     engine: "ai-sdk:openrouter",
-    model: "cohere/north-mini-code:free",
+    model: "nvidia/nemotron-3.5-lightning:free",
   },
 });

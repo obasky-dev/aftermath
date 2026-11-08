@@ -19,7 +19,7 @@ Set in the Vercel production environment:
 - `AGENT_NATIVE_RELEASE_MIGRATIONS=1`, `AGENT_NATIVE_HOSTED_HARNESS=true`.
 - `AGENT_NATIVE_VERCEL_CRON_SCHEDULE=0 9 * * *` — Hobby plans reject the framework's per-minute sweep.
 - `AFTERMATH_PUBLIC_DEMO=1` — issues the demo identity to reviewers without sign-in. It is not `AUTH_DISABLED`; the auth stack still runs, and destructive actions are closed while it is on.
-- `OPENROUTER_API_KEY` — deploy-level model key. `agent-native.config.ts` pins the engine to `ai-sdk:openrouter` and the model to `nvidia/nemotron-3-ultra-550b-a55b:free`, so visitors never connect a provider themselves.
+- `OPENROUTER_API_KEY` — deploy-level model key. `agent-native.config.ts` pins the engine to `ai-sdk:openrouter` and the model to `nvidia/nemotron-3.5-lightning:free`, so visitors never connect a provider themselves.
 
 `vercel.json` builds the Nitro Vercel output (`NITRO_PRESET=vercel pnpm build`). Public demo mode is on, so the URL opens without sign-in. The demo account `demo@aftermath.app` / `Aftermath-demo-2026` still exists for direct API use. The Builder connection used during local signup lives in the local PGlite, not in the hosted database, which is why the first deployment prompted every visitor. The deploy-level `OPENROUTER_API_KEY` fixes that: the agent is configured before any visitor arrives.
 
