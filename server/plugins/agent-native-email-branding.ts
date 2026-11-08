@@ -11,10 +11,13 @@ export default defineAppConfig({
     // Optional: use your own absolute HTTPS logo URL in transactional emails.
     // logoUrl: "https://example.com/logo.png",
   },
-  // Runtime agent config. The engine reads OPENROUTER_API_KEY from the
-  // deployment environment, so no visitor is asked to connect a provider.
+  // Runtime agent config. The OpenAI-compatible engine reads OPENAI_API_KEY and
+  // OPENAI_BASE_URL (Groq) from the deployment, so no visitor connects one.
   agent: {
     engine: "ai-sdk:openai",
     model: "qwen/qwen3.8-27b",
+    // Groq caps max_tokens at 16384 for this model.
+    mainChatMaxOutputTokens: 8192,
+    emptyResponseRetryMaxOutputTokens: 8192,
   },
 });
