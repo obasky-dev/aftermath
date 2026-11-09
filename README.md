@@ -106,7 +106,7 @@ No live provider credentials are connected in this build. The provider calls are
 
 ## Model
 
-The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` via `defineAppConfig({ agent: { engine: "ai-sdk:openai", model: "qwen/qwen3.8-27b" } })`, mirrored in `agent-native.config.ts` for the build/client. The live deployment points the OpenAI-compatible engine at Groq (`OPENAI_BASE_URL=https://api.groq.com/openai/v1`) with `OPENAI_API_KEY` as a Vercel secret. The model is non-reasoning and fast: tool calls return in about a second, so visitors never connect a provider and the agent answers promptly. Locally, put the same two values in `.env.local` (git-ignored) or connect Builder.io in the app.
+The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` via `defineAppConfig({ agent: { engine: "ai-sdk:openai", model: "deepseek-ai/DeepSeek-V4.1-Flash-1017" } })`, mirrored in `agent-native.config.ts` for the build/client. The live deployment points the OpenAI-compatible engine at River (`OPENAI_BASE_URL=https://api.river.ai/v1`) with `OPENAI_API_KEY` as a Vercel secret. The model is non-reasoning and fast: tool calls return in about a second, so visitors never connect a provider and the agent answers promptly. Locally, put the same two values in `.env.local` (git-ignored) or connect Builder.io in the app.
 
 ## Why this is agent-native
 
@@ -194,7 +194,7 @@ The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` 
 | Public share on live | `/share/03UOScRIovmxePovSGf__I3S` returns 200 without a session |
 | Live click-through | Headless browser with no cookies: Try the correction → 3 min / 21 min / contradicted; Accept the evidence → no unresolved conflicts; no console errors |
 | Live write guard | `delete-incident` without a session returns 403; timeline edits succeed |
-| Live model | `/agent-engine/status` with no cookie: configured, `ai-sdk:openai` (Groq base URL), `qwen/qwen3.8-27b`, `chatEligible: true`; a live agent turn answers with native analysis cards and no connect prompt |
+| Live model | `/agent-engine/status` with no cookie: configured, `ai-sdk:openai` (River base URL), `deepseek-ai/DeepSeek-V4.1-Flash-1017`, `chatEligible: true`; a live agent turn answers with native analysis cards and no connect prompt |
 | Evidence links | The suspected cause carries its build-log evidence over HTTP |
 | Incident list and detail | HTTP 200 |
 

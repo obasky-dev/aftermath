@@ -5,7 +5,7 @@
  * preserved on later visits.
  */
 const SELECTION = {
-  model: "qwen/qwen3.8-27b",
+  model: "deepseek-ai/DeepSeek-V4.1-Flash-1017",
   engine: "ai-sdk:openai",
   effort: "auto",
 } as const;
@@ -14,6 +14,7 @@ const SELECTION = {
 const PREVIOUS_DEFAULTS = new Set([
   "cohere/north-mini-code:free",
   "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "qwen/qwen3.8-27b",
   "nvidia/nemotron-3.5-lightning:free",
 ]);
 

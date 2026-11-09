@@ -12,12 +12,11 @@ export default defineAppConfig({
     // logoUrl: "https://example.com/logo.png",
   },
   // Runtime agent config. The OpenAI-compatible engine reads OPENAI_API_KEY and
-  // OPENAI_BASE_URL (Groq) from the deployment, so no visitor connects one.
+  // OPENAI_BASE_URL (River) from the deployment, so no visitor connects one.
   agent: {
     engine: "ai-sdk:openai",
-    model: "qwen/qwen3.8-27b",
-    // Groq caps max_tokens at 16384 for this model.
-    mainChatMaxOutputTokens: 1024,
-    emptyResponseRetryMaxOutputTokens: 1024,
+    model: "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+    mainChatMaxOutputTokens: 8192,
+    emptyResponseRetryMaxOutputTokens: 8192,
   },
 });

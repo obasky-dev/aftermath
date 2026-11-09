@@ -19,9 +19,9 @@ Set in the Vercel production environment:
 - `AGENT_NATIVE_RELEASE_MIGRATIONS=1`, `AGENT_NATIVE_HOSTED_HARNESS=true`.
 - `AGENT_NATIVE_VERCEL_CRON_SCHEDULE=0 9 * * *` — Hobby plans reject the framework's per-minute sweep.
 - `AFTERMATH_PUBLIC_DEMO=1` — issues the demo identity to reviewers without sign-in. It is not `AUTH_DISABLED`; the auth stack still runs, and destructive actions are closed while it is on.
-- `OPENAI_API_KEY` + `OPENAI_BASE_URL` — the deploy-level Groq credentials (`https://api.groq.com/openai/v1`). The runtime app config pins the engine to `ai-sdk:openai` and the model to `qwen/qwen3.8-27b`, so visitors never connect a provider themselves. The model is non-reasoning and answers in about a second.
+- `OPENAI_API_KEY` + `OPENAI_BASE_URL` — the deploy-level River credentials (`https://api.river.ai/v1`). The runtime app config pins the engine to `ai-sdk:openai` and the model to `deepseek-ai/DeepSeek-V4.1-Flash-1017`, so visitors never connect a provider themselves. The model is non-reasoning and answers in about a second.
 
-`vercel.json` builds the Nitro Vercel output (`NITRO_PRESET=vercel pnpm build`). Public demo mode is on, so the URL opens without sign-in. The demo account `demo@aftermath.app` / `Aftermath-demo-2026` still exists for direct API use. The Builder connection used during local signup lives in the local PGlite, not in the hosted database, which is why the first deployment prompted every visitor. The deploy-level Groq key fixes that: the agent is configured before any visitor arrives.
+`vercel.json` builds the Nitro Vercel output (`NITRO_PRESET=vercel pnpm build`). Public demo mode is on, so the URL opens without sign-in. The demo account `demo@aftermath.app` / `Aftermath-demo-2026` still exists for direct API use. The Builder connection used during local signup lives in the local PGlite, not in the hosted database, which is why the first deployment prompted every visitor. The deploy-level River key fixes that: the agent is configured before any visitor arrives.
 
 ## Needed for live integrations
 
