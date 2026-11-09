@@ -6,13 +6,13 @@ Built for the [Agent-Native Hackathon](https://www.builder.io/hackathon) on Buil
 
 ## Live demo
 
-**https://aftermath-live.vercel.app**
+**https://aftermath-beryl.vercel.app**
 
 No login is required. The production deployment issues a demo identity through the auth layer (`getAdditionalSession` gated by `AFTERMATH_PUBLIC_DEMO=1`), so reviewers open the URL and land in the app. Destructive actions (`delete-incident`, `delete-incident-event`, `delete-incident-comment`) and webhook token rotation are closed in public-demo mode; everything the demo needs stays open.
 
 The demo data is fictional. Use the **Import a pack** screen or re-run `seed-demo-incident` if the timeline has been changed. If the flag is turned off, the same deployment falls back to normal sign-in; the account `demo@aftermath.app` / `Aftermath-demo-2026` exists for that case. The read-only postmortem for the seeded incident is also public:
 
-**https://aftermath-live.vercel.app/share/03UOScRIovmxePovSGf__I3S**
+**https://aftermath-beryl.vercel.app/share/03UOScRIovmxePovSGf__I3S**
 
 Deployment runs on Vercel with hosted Neon Postgres, release migrations applied. Sign-in is enabled; the demo account is the shortcut for reviewers.
 
@@ -190,7 +190,7 @@ The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` 
 | One-click resolution | `eventStatus: red_herring` persists and the conflict disappears from `list-conflicts` |
 | Slack command | Signed `status` returns the verdict; unsigned returns 401; signed `move` changes the same event row to 14:04 |
 | Pages render | `/incidents`, `/connections` and `/incidents/:id` return 200 with their SSR title and no error page |
-| Live deployment | `aftermath-live.vercel.app` serves the app without Vercel SSO, signs in the demo account, lists the seeded incident, and returns `weak / 25 / 43` from `analyze-incident` |
+| Live deployment | `aftermath-beryl.vercel.app` serves the app without Vercel SSO, signs in the demo account, lists the seeded incident, and returns `weak / 25 / 43` from `analyze-incident` |
 | Public share on live | `/share/03UOScRIovmxePovSGf__I3S` returns 200 without a session |
 | Live click-through | Headless browser with no cookies: Try the correction → 3 min / 21 min / contradicted; Accept the evidence → no unresolved conflicts; no console errors |
 | Live write guard | `delete-incident` without a session returns 403; timeline edits succeed |
