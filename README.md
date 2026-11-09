@@ -14,7 +14,7 @@ The demo data is fictional. Use the **Import a pack** screen or re-run `seed-dem
 
 **https://aftermath-beryl.vercel.app/share/03UOScRIovmxePovSGf__I3S**
 
-Deployment runs on Vercel with hosted Neon Postgres, release migrations applied. Sign-in is enabled; the demo account is the shortcut for reviewers.
+Deployment runs on Vercel with hosted Neon Postgres and release migrations applied. Public demo mode is on; normal sign-in remains available if the flag is turned off.
 
 ![Aftermath landing page](docs/screenshots/landing.png)
 
@@ -194,7 +194,8 @@ The runtime engine is pinned in `server/plugins/agent-native-email-branding.ts` 
 | Public share on live | `/share/03UOScRIovmxePovSGf__I3S` returns 200 without a session |
 | Live click-through | Headless browser with no cookies: Try the correction → 3 min / 21 min / contradicted; Accept the evidence → no unresolved conflicts; no console errors |
 | Live write guard | `delete-incident` without a session returns 403; timeline edits succeed |
-| Live model | `/agent-engine/status` with no cookie: configured, `ai-sdk:openai` (River base URL), `deepseek-ai/DeepSeek-V4.1-Flash-1017`, `chatEligible: true`; a live agent turn answers with native analysis cards and no connect prompt |
+| Live model | `/agent-engine/status` with no cookie: configured, `ai-sdk:openai` (River base URL), `deepseek-ai/DeepSeek-V4.1-Flash-1017`, `chatEligible: true` |
+| Live agent turn | After the correction, **Ask the agent** returned two native analysis cards and a correct narrative in about 13 seconds: `consistent`, deploy leads at 3 min, exposure 21 min, failover red-herring, with the 45% confidence caveat |
 | Evidence links | The suspected cause carries its build-log evidence over HTTP |
 | Incident list and detail | HTTP 200 |
 

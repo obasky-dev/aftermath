@@ -35,6 +35,8 @@ Every line below is from the GitHub Actions run for commit `3a190ea`, not a hand
 | Live click-through | Headless Chromium, no cookies: **Try the correction** → `3 min`, `21 min`, failover `contradicted`; **Accept the evidence** → "No unresolved conflicts"; no console errors. Demo restored to 13:40 / weak / 25 / 43. |
 | Live write guard | `delete-incident` without a session returns **403** while timeline edits and conflict resolutions succeed |
 | Live model | `/agent-engine/status` with no cookie: `configured: true`, `ai-sdk:openai` (custom River base URL), `deepseek-ai/DeepSeek-V4.1-Flash-1017`, `source: env`, `chatEligible: true`. A fresh browser receives the same model/engine in the composer selection. |
+| Live agent turn | After the correction, **Ask the agent** returned two native analysis cards and a correct three-paragraph answer in ~13 seconds: `consistent`, 3-minute lag, 21-minute exposure, failover red herring, and the 45% deploy-confidence caveat. |
+| Demo video | `C:/Users/HP/Desktop/aftermath-demo.mp4` (2:11, 1080p, narrated, agent scene included) with `.srt` captions and a transcript. |
 
 ## Implemented, not browser-automated
 
